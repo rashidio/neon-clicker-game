@@ -1,0 +1,4 @@
+.env
+*.tar
+frontend/dist/
+frontend/node_modules/*
