@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Trophy, Zap, ShoppingCart, Clock, Timer } from 'lucide-react';
+import { Trophy, Zap, ShoppingCart, Clock, Timer, Check } from 'lucide-react';
 import { retrieveLaunchParams } from '@telegram-apps/sdk';
 
 export default function NeonClickerGame() {
@@ -37,7 +37,7 @@ export default function NeonClickerGame() {
           language_code: "en",
           is_premium: false
         };
-        
+
         const mockInitData = new URLSearchParams({
           user: JSON.stringify(mockUser),
           auth_date: Math.floor(Date.now() / 1000).toString(),
@@ -446,6 +446,13 @@ export default function NeonClickerGame() {
   const [hasInitiallyLoadedRichest, setHasInitiallyLoadedRichest] = useState(false);
   const [hasInitiallyLoadedPerSecond, setHasInitiallyLoadedPerSecond] = useState(false);
   const [hasInitiallyLoadedClicks, setHasInitiallyLoadedClicks] = useState(false);
+  const [donationGoals, setDonationGoals] = useState<any[]>([]);
+  const [donationsLoading, setDonationsLoading] = useState(false);
+  const [selectedDonationGoalId, setSelectedDonationGoalId] = useState<number | null>(null);
+  const [donationDetails, setDonationDetails] = useState<Record<number, any>>({});
+  const [detailLoading, setDetailLoading] = useState<Record<number, boolean>>({});
+  const [showTopDonors, setShowTopDonors] = useState<Record<number, boolean>>({});
+  const [confirmDonation, setConfirmDonation] = useState<{ goalId: number; percent: 10 | 25 | 50 | 100 } | null>(null);
   
   
   // Fetch leaderboard from backend
@@ -492,6 +499,56 @@ export default function NeonClickerGame() {
       });
   }, [isInitialized, userId, isTelegramContext, sessionId, initData]);
 
+  const fetchDonationGoals = React.useCallback((silent = false) => {
+    if (!isInitialized || !userId) return;
+    if (!silent) setDonationsLoading(true);
+    makeAuthenticatedRequest('/api/donations/goals')
+      .then(res => res.json())
+      .then(data => {
+        setDonationGoals(Array.isArray(data) ? data : []);
+      })
+      .catch(() => setDonationGoals([]))
+      .finally(() => {
+        if (!silent) setDonationsLoading(false);
+      });
+  }, [isInitialized, userId, sessionId, initData]);
+
+  const fetchDonationGoalDetail = React.useCallback((goalId: number) => {
+    if (!isInitialized || !userId) return;
+    setDetailLoading(prev => ({ ...prev, [goalId]: true }));
+    makeAuthenticatedRequest(`/api/donations/goal?id=${goalId}`)
+      .then(res => res.json())
+      .then(data => {
+        setSelectedDonationGoalId(goalId);
+        setDonationDetails(prev => ({ ...prev, [goalId]: data }));
+      })
+      .finally(() => setDetailLoading(prev => ({ ...prev, [goalId]: false })));
+  }, [isInitialized, userId, sessionId, initData]);
+
+  const donate = async (goalId: number, percent: 10 | 25 | 50 | 100) => {
+    if (!isInitialized || !userId) return;
+    try {
+      const res = await makeAuthenticatedRequest('/api/donations/donate', {
+        method: 'POST',
+        body: JSON.stringify({ goal_id: goalId, percent })
+      });
+      const result = await res.json();
+      if (result.success) {
+        setScore(result.score ?? score);
+        fetchDonationGoals(true);
+        if (selectedDonationGoalId === goalId) {
+          setDonationDetails(prev => ({ ...prev, [goalId]: result.goal }));
+        }
+        // silently refresh richest leaderboard after donation
+        fetchLeaderboard(true);
+      } else {
+        setError(result.message || 'Donation failed');
+      }
+    } catch {
+      setError('Donation failed');
+    }
+  };
+
   // Fetch clicks leaderboard from backend
   const fetchClicksLeaderboard = React.useCallback((silent = false) => {
     if (!isInitialized || !userId) return;
@@ -521,6 +578,24 @@ export default function NeonClickerGame() {
       setHasInitiallyLoadedClicks(false);
     }
   }, [activeTab]);
+
+  // Auto-load donation goals when opening the Donations tab
+  useEffect(() => {
+    if (activeTab !== 'donations') return;
+    if (!isInitialized || !userId) return;
+    fetchDonationGoals();
+  }, [activeTab, isInitialized, userId, fetchDonationGoals]);
+
+  // Auto-fetch donors for all goals once goals are loaded (cache per goal)
+  useEffect(() => {
+    if (activeTab !== 'donations') return;
+    if (!donationGoals || donationGoals.length === 0) return;
+    donationGoals.forEach(g => {
+      if (!donationDetails[g.id] && !detailLoading[g.id]) {
+        fetchDonationGoalDetail(g.id);
+      }
+    });
+  }, [activeTab, donationGoals, donationDetails, detailLoading, fetchDonationGoalDetail]);
 
   // Initial leaderboard fetch when tab is opened
   useEffect(() => {
@@ -661,6 +736,30 @@ export default function NeonClickerGame() {
     }
   };
 
+  const formatCompact = (n: number | bigint) => {
+    const num = typeof n === 'bigint' ? Number(n) : (n ?? 0);
+    const abs = Math.abs(num);
+    if (abs >= 1_000_000_000_000) return `${Math.round(num / 1_000_000_000_000)}T`;
+    if (abs >= 1_000_000_000) return `${Math.round(num / 1_000_000_000)}B`;
+    if (abs >= 1_000_000) return `${Math.round(num / 1_000_000)}M`;
+    if (abs >= 1_000) return `${Math.round(num / 1_000)}K`;
+    return num.toLocaleString();
+  };
+
+  const formatPercent = (p: number) => {
+    if (!isFinite(p) || p <= 0) return '0%';
+    // Allow >100% display
+    if (p >= 1) {
+      // Show up to 2 decimals for large values
+      const val = p % 1 === 0 ? p.toFixed(0) : p.toFixed(2);
+      return `${val}%`;
+    }
+    const minShown = 0.00001;
+    if (p > 0 && p < minShown) return `${minShown}%`;
+    const fixed = p.toFixed(5);
+    return `${fixed.replace(/0+$/,'').replace(/\.$/, '')}%`;
+  };
+
   // Detect when total production changes and trigger highlight
   useEffect(() => {
     if (totalProduction > prevTotalProduction && prevTotalProduction > 0) {
@@ -771,7 +870,8 @@ export default function NeonClickerGame() {
             {[
               { id: 'game', label: 'PLAY', icon: Zap },
               { id: 'shop', label: 'PRODUCERS', icon: ShoppingCart },
-              { id: 'leaderboard', label: 'RANKS', icon: Trophy }
+              { id: 'donations', label: 'DONATIONS', icon: Trophy },
+              { id: 'leaderboard', label: 'RANKS' }
             ].map(tab => (
               <button
                 key={tab.id}
@@ -782,8 +882,17 @@ export default function NeonClickerGame() {
                     : 'text-gray-500 hover:text-gray-300'
                 }`}
               >
-                <tab.icon className="w-4 h-4" strokeWidth={1.5} />
-                {tab.label}
+                {tab.id === 'leaderboard' ? (
+                  <span className="relative inline-flex items-center gap-2">
+                    <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse shadow-[0_0_8px_rgba(74,222,128,0.8)]"></span>
+                    {tab.label}
+                  </span>
+                ) : (
+                  <>
+                    {tab.icon && <tab.icon className="w-4 h-4" strokeWidth={1.5} />}
+                    {tab.label}
+                  </>
+                )}
                 {activeTab === tab.id && (
                   <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-400 to-transparent"></div>
                 )}
@@ -1043,17 +1152,121 @@ export default function NeonClickerGame() {
             </div>
             )}
 
+          {activeTab === 'donations' && (
+            <div className="max-w-3xl mx-auto space-y-6">
+              {donationsLoading && (
+                <div className="text-center text-gray-500">Loading...</div>
+              )}
+              {!donationsLoading && donationGoals.length === 0 && (
+                <div className="text-center text-gray-500">No goals.</div>
+              )}
+              {!donationsLoading && donationGoals.map(g => {
+                const rawPercent = Number(g.percent || 0);
+                const percentBar = Math.max(0, Math.min(100, rawPercent));
+                const percentLabel = formatPercent(rawPercent);
+                const selected = !!showTopDonors[g.id];
+                const renderDonateBtn = (p: 10 | 25 | 50 | 100, color: string, border: string, text: string) => {
+                  const isConfirm = confirmDonation && confirmDonation.goalId === g.id && confirmDonation.percent === p;
+                  const baseClasses = `py-2 rounded-xl text-xs font-light tracking-widest border ${border} flex items-center justify-center gap-2`;
+                  const confirmedClasses = 'bg-green-500/20 border border-green-400/40 text-green-400';
+                  const normalClasses = `${color}`;
+                  const donateAmount = Math.floor((score * p) / 100);
+                  const disabled = donateAmount <= 0;
+                  return (
+                    <button
+                      key={p}
+                      disabled={disabled}
+                      onClick={() => {
+                        if (disabled) return;
+                        if (isConfirm) {
+                          donate(g.id, p);
+                          setConfirmDonation(null);
+                        } else {
+                          setConfirmDonation({ goalId: g.id, percent: p });
+                          setTimeout(() => {
+                            setConfirmDonation(prev => (prev && prev.goalId === g.id && prev.percent === p ? null : prev));
+                          }, 2500);
+                        }
+                      }}
+                      className={`${baseClasses} ${disabled ? 'opacity-40 cursor-not-allowed bg-white/5 text-gray-500 border-white/10' : (isConfirm ? confirmedClasses : normalClasses)}`}
+                    >
+                      {isConfirm ? (
+                        <>
+                          <Check className="w-4 h-4" />
+                          Donate {formatCompact(donateAmount)}?
+                        </>
+                      ) : text}
+                    </button>
+                  );
+                };
+                return (
+                  <div key={g.id} className="bg-gradient-to-br from-white/5 to-white/0 backdrop-blur-sm border border-white/10 rounded-2xl p-6 hover:border-cyan-500/30 transition-all duration-300">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <div className="text-sm text-white font-light">{g.name}</div>
+                        <div className="text-xs text-gray-500">Target {formatCompact(g.target)}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <div className="text-xl font-extralight text-cyan-400">{percentLabel}</div>
+                          {rawPercent >= 100 && (
+                            <span className="px-2 py-0.5 rounded bg-green-500/20 border border-green-400/30 text-green-400 text-[10px] uppercase tracking-widest">done!</span>
+                          )}
+                        </div>
+                        <div className="text-xs text-gray-500">{formatCompact(g.total_donated || 0)}</div>
+                      </div>
+                    </div>
+                    <div className="relative w-full h-2 bg-white/10 rounded-full overflow-hidden mb-4">
+                      <div className="absolute inset-0 neon-scan"></div>
+                      <div className="relative h-full bg-cyan-500/60" style={{ width: `${percentBar}%` }}></div>
+                    </div>
+                    <div className="grid grid-cols-4 gap-3 mb-3">
+                      {renderDonateBtn(10, 'bg-cyan-500/10 border-cyan-400/30 text-cyan-400 hover:bg-cyan-500/20', 'border-cyan-400/30', '10%')}
+                      {renderDonateBtn(25, 'bg-indigo-500/10 border-indigo-400/30 text-indigo-400 hover:bg-indigo-500/20', 'border-indigo-400/30', '25%')}
+                      {renderDonateBtn(50, 'bg-purple-500/10 border-purple-400/30 text-purple-400 hover:bg-purple-500/20', 'border-purple-400/30', '50%')}
+                      {renderDonateBtn(100, 'bg-pink-500/10 border-pink-400/30 text-pink-400 hover:bg-pink-500/20', 'border-pink-400/30', '100%')}
+                    </div>
+                    <div className="flex items-center justify-end">
+                      <button
+                        className="text-[11px] px-2 py-1 rounded border border-white/10 text-gray-400 hover:text-gray-200 hover:border-white/20"
+                        onClick={() => setShowTopDonors(prev => ({ ...prev, [g.id]: !prev[g.id] }))}
+                      >
+                        {selected ? 'Hide top donors' : 'Show top donors'}
+                      </button>
+                    </div>
+                    {selected && (
+                      <div className="mt-3 space-y-2">
+                        {detailLoading[g.id] && (
+                          <div className="text-xs text-gray-500">Loading...</div>
+                        )}
+                        {!detailLoading[g.id] && donationDetails[g.id] && (
+                          <>
+                            {(donationDetails[g.id].top_donors || []).length === 0 && (
+                              <div className="text-xs text-gray-400 italic">No donors yet.</div>
+                            )}
+                            {(donationDetails[g.id].top_donors || []).slice(0,5).map((d: any, i: number) => (
+                              <div key={i} className={`flex items-center justify-between bg-gradient-to-br from-white/5 to-white/0 backdrop-blur-sm border border-white/10 rounded-xl p-3 ${i===0?'border-yellow-400/30':'hover:border-cyan-500/30'} transition-all`}>
+                                <div className="flex items-center gap-3">
+                                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-light ${i===0?'bg-yellow-400/20 text-yellow-300 border border-yellow-400/30':'bg-white/5 text-gray-400 border border-white/10'}`}>{i+1}</div>
+                                  <div className="font-light text-gray-300">{d.user_id}</div>
+                                </div>
+                                <div className="text-cyan-400">{Number(d.amount).toLocaleString()}</div>
+                              </div>
+                            ))}
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           {activeTab === 'leaderboard' && (
             <div className="max-w-2xl mx-auto space-y-4">
-              {/* Live indicator and toggle */}
-              <div className="flex items-center justify-center gap-4 mb-6">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                  <span className="text-xs text-gray-400 font-light tracking-widest">LIVE</span>
-                </div>
-                
-                {/* Toggle switch */}
-                <div className="flex items-center gap-2">
+              {/* Toggle switch */}
+              <div className="flex items-center justify-center gap-2 mb-6">
                   <button 
                     className={`px-3 py-1 rounded text-xs transition-all duration-200 ${
                       leaderboardMode === 'richest' 
@@ -1096,7 +1309,6 @@ export default function NeonClickerGame() {
                   >
                     CLICKS
                   </button>
-                </div>
               </div>
               
               {!leaderboardLoading && leaderboardMode === 'richest' && hasInitiallyLoadedRichest && leaderboard.length === 0 && (
@@ -1231,6 +1443,19 @@ export default function NeonClickerGame() {
             opacity: 0.8;
             filter: drop-shadow(0 0 2px #06b6d4) drop-shadow(0 0 4px #06b6d4) drop-shadow(0 0 6px #06b6d4);
           }
+        }
+        
+        @keyframes neon-scan {
+          0% { background-position: 0% 0; }
+          100% { background-position: 200% 0; }
+        }
+
+        .neon-scan {
+          background: linear-gradient(90deg, rgba(6, 182, 212, 0) 0%, rgba(6, 182, 212, 0.25) 50%, rgba(6, 182, 212, 0) 100%);
+          background-size: 200% 100%;
+          animation: neon-scan 2s linear infinite;
+          opacity: 0.6;
+          mix-blend-mode: screen;
         }
         
       `}</style>
