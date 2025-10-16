@@ -11,6 +11,15 @@ import LeaderboardTabs from './components/LeaderboardTabs';
 import TabsBar from './components/TabsBar';
 import AnimatedBackground from './components/AnimatedBackground';
 import QuickAccessProducers from './components/QuickAccessProducers';
+import {
+  Producer,
+  LeaderboardEntryRichest,
+  LeaderboardEntryPerSecond,
+  LeaderboardEntryClicks,
+  DonationGoal,
+  DonationGoalDetail,
+  DonationConfirmState,
+} from './types';
 
 export default function NeonClickerGame() {
   // ==== BACKEND INTEGRATION BLOCK ====
@@ -443,28 +452,28 @@ export default function NeonClickerGame() {
   const [boostTimeLeft, setBoostTimeLeft] = useState(0);
   const boostMultiplier = boostActive ? 2 : 1;
   const [clicks, setClicks] = useState([]);
-  const [producers, setProducers] = useState([]);
+  const [producers, setProducers] = useState<Producer[]>([]);
   const [producersLoading, setProducersLoading] = useState(true);
   const [isHighlighted, setIsHighlighted] = useState(false);
   const [prevTotalProduction, setPrevTotalProduction] = useState(0);
   // Replace and extend hardcoded leaderboard
-  const [leaderboard, setLeaderboard] = useState<any[]>([]);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntryRichest[]>([]);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [leaderboardMode, setLeaderboardMode] = useState<'richest' | 'per_second' | 'clicks'>('richest');
-  const [perSecondLeaderboard, setPerSecondLeaderboard] = useState<any[]>([]);
-  const [clicksLeaderboard, setClicksLeaderboard] = useState<any[]>([]);
+  const [perSecondLeaderboard, setPerSecondLeaderboard] = useState<LeaderboardEntryPerSecond[]>([]);
+  const [clicksLeaderboard, setClicksLeaderboard] = useState<LeaderboardEntryClicks[]>([]);
   const [hasInitiallyLoadedRichest, setHasInitiallyLoadedRichest] = useState(false);
   const [hasInitiallyLoadedPerSecond, setHasInitiallyLoadedPerSecond] = useState(false);
   const [hasInitiallyLoadedClicks, setHasInitiallyLoadedClicks] = useState(false);
-  const [donationGoals, setDonationGoals] = useState<any[]>([]);
+  const [donationGoals, setDonationGoals] = useState<DonationGoal[]>([]);
   const [donationsLoading, setDonationsLoading] = useState(false);
   const [selectedDonationGoalId, setSelectedDonationGoalId] = useState<number | null>(null);
-  const [donationDetails, setDonationDetails] = useState<Record<number, any>>({});
+  const [donationDetails, setDonationDetails] = useState<Record<number, DonationGoalDetail>>({});
   const [detailLoading, setDetailLoading] = useState<Record<number, boolean>>({});
   const [showTopDonors, setShowTopDonors] = useState<Record<number, boolean>>({});
-  const [confirmDonation, setConfirmDonation] = useState<{ goalId: number; percent: 10 | 25 | 50 | 100 } | null>(null);
-  const [donationSubmitting, setDonationSubmitting] = useState<{ goalId: number; percent: 10 | 25 | 50 | 100 } | null>(null);
-  const [donationSuccess, setDonationSuccess] = useState<{ goalId: number; percent: 10 | 25 | 50 | 100 } | null>(null);
+  const [confirmDonation, setConfirmDonation] = useState<DonationConfirmState | null>(null);
+  const [donationSubmitting, setDonationSubmitting] = useState<DonationConfirmState | null>(null);
+  const [donationSuccess, setDonationSuccess] = useState<DonationConfirmState | null>(null);
   
   
   // Fetch leaderboard from backend
