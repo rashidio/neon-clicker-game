@@ -453,6 +453,8 @@ export default function NeonClickerGame() {
   const [detailLoading, setDetailLoading] = useState<Record<number, boolean>>({});
   const [showTopDonors, setShowTopDonors] = useState<Record<number, boolean>>({});
   const [confirmDonation, setConfirmDonation] = useState<{ goalId: number; percent: 10 | 25 | 50 | 100 } | null>(null);
+  const [donationSubmitting, setDonationSubmitting] = useState<{ goalId: number; percent: 10 | 25 | 50 | 100 } | null>(null);
+  const [donationSuccess, setDonationSuccess] = useState<{ goalId: number; percent: 10 | 25 | 50 | 100 } | null>(null);
   
   
   // Fetch leaderboard from backend
@@ -528,6 +530,8 @@ export default function NeonClickerGame() {
   const donate = async (goalId: number, percent: 10 | 25 | 50 | 100) => {
     if (!isInitialized || !userId) return;
     try {
+      // keep the confirm button on screen; mark as submitting
+      setDonationSubmitting({ goalId, percent });
       const res = await makeAuthenticatedRequest('/api/donations/donate', {
         method: 'POST',
         body: JSON.stringify({ goal_id: goalId, percent })
@@ -541,10 +545,19 @@ export default function NeonClickerGame() {
         }
         // silently refresh richest leaderboard after donation
         fetchLeaderboard(true);
+        // show success on the same confirmation button, then revert
+        setDonationSubmitting(null);
+        setDonationSuccess({ goalId, percent });
+        setTimeout(() => {
+          setDonationSuccess(prev => (prev && prev.goalId === goalId ? null : prev));
+          setConfirmDonation(prev => (prev && prev.goalId === goalId ? null : prev));
+        }, 500);
       } else {
+        setDonationSubmitting(null);
         setError(result.message || 'Donation failed');
       }
     } catch {
+      setDonationSubmitting(null);
       setError('Donation failed');
     }
   };
@@ -865,18 +878,18 @@ export default function NeonClickerGame() {
         </div>
 
         {/* Tabs */}
-        <div className="max-w-6xl mx-auto px-8 mt-8">
-          <div className="flex gap-8 border-b border-white/10">
+        <div className="max-w-6xl mx-auto px-4 sm:px-8 mt-6 sm:mt-8 mb-4 sm:mb-6">
+          <div className="flex gap-5 sm:gap-8 border-b border-white/10">
             {[
-              { id: 'game', label: 'PLAY', icon: Zap },
-              { id: 'shop', label: 'PRODUCERS', icon: ShoppingCart },
-              { id: 'donations', label: 'DONATIONS', icon: Trophy },
+              { id: 'game', label: 'TAP', icon: Zap },
+              { id: 'shop', label: 'PRODUCE', icon: ShoppingCart },
+              { id: 'donations', label: 'DONATE', icon: Trophy },
               { id: 'leaderboard', label: 'RANKS' }
             ].map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`pb-3 text-sm font-light tracking-wide transition-all relative flex items-center gap-2 ${
+                className={`pb-2 sm:pb-3 text-xs sm:text-sm font-light tracking-normal sm:tracking-wide transition-all relative flex items-center gap-2 sm:gap-2 ${
                   activeTab === tab.id
                     ? 'text-cyan-400'
                     : 'text-gray-500 hover:text-gray-300'
@@ -1167,11 +1180,13 @@ export default function NeonClickerGame() {
                 const selected = !!showTopDonors[g.id];
                 const renderDonateBtn = (p: 10 | 25 | 50 | 100, color: string, border: string, text: string) => {
                   const isConfirm = confirmDonation && confirmDonation.goalId === g.id && confirmDonation.percent === p;
-                  const baseClasses = `py-2 rounded-xl text-xs font-light tracking-widest border ${border} flex items-center justify-center gap-2`;
+                  const isSubmitting = donationSubmitting && donationSubmitting.goalId === g.id && donationSubmitting.percent === p;
+                  const isSuccess = donationSuccess && donationSuccess.goalId === g.id && donationSuccess.percent === p;
+                  const baseClasses = `${isConfirm ? 'w-full' : ''} py-2 text-xs rounded-xl font-light tracking-widest border ${border} flex items-center justify-center gap-2`;
                   const confirmedClasses = 'bg-green-500/20 border border-green-400/40 text-green-400';
                   const normalClasses = `${color}`;
                   const donateAmount = Math.floor((score * p) / 100);
-                  const disabled = donateAmount <= 0;
+                  const disabled = donateAmount <= 0 || !!isSubmitting;
                   return (
                     <button
                       key={p}
@@ -1180,7 +1195,6 @@ export default function NeonClickerGame() {
                         if (disabled) return;
                         if (isConfirm) {
                           donate(g.id, p);
-                          setConfirmDonation(null);
                         } else {
                           setConfirmDonation({ goalId: g.id, percent: p });
                           setTimeout(() => {
@@ -1188,14 +1202,25 @@ export default function NeonClickerGame() {
                           }, 2500);
                         }
                       }}
-                      className={`${baseClasses} ${disabled ? 'opacity-40 cursor-not-allowed bg-white/5 text-gray-500 border-white/10' : (isConfirm ? confirmedClasses : normalClasses)}`}
+                      className={`${baseClasses} ${disabled && !isConfirm ? 'opacity-40 cursor-not-allowed bg-white/5 text-gray-500 border-white/10' : (isConfirm ? confirmedClasses : normalClasses)}`}
                     >
                       {isConfirm ? (
-                        <>
-                          <Check className="w-4 h-4" />
-                          Donate {formatCompact(donateAmount)}?
-                        </>
-                      ) : text}
+                        isSubmitting ? (
+                          <>Donating...</>
+                        ) : isSuccess ? (
+                          <>
+                            <Check className="w-4 h-4" />
+                            Donated!
+                          </>
+                        ) : (
+                          <>
+                            <Check className="w-4 h-4" />
+                            Donate {formatCompact(donateAmount)}?
+                          </>
+                        )
+                      ) : (
+                        text
+                      )}
                     </button>
                   );
                 };
@@ -1220,16 +1245,22 @@ export default function NeonClickerGame() {
                       <div className="absolute inset-0 neon-scan"></div>
                       <div className="relative h-full bg-cyan-500/60" style={{ width: `${percentBar}%` }}></div>
                     </div>
-                    <div className="grid grid-cols-4 gap-3 mb-3">
-                      {renderDonateBtn(10, 'bg-cyan-500/10 border-cyan-400/30 text-cyan-400 hover:bg-cyan-500/20', 'border-cyan-400/30', '10%')}
-                      {renderDonateBtn(25, 'bg-indigo-500/10 border-indigo-400/30 text-indigo-400 hover:bg-indigo-500/20', 'border-indigo-400/30', '25%')}
-                      {renderDonateBtn(50, 'bg-purple-500/10 border-purple-400/30 text-purple-400 hover:bg-purple-500/20', 'border-purple-400/30', '50%')}
-                      {renderDonateBtn(100, 'bg-pink-500/10 border-pink-400/30 text-pink-400 hover:bg-pink-500/20', 'border-pink-400/30', '100%')}
+                    <div className={`grid ${confirmDonation && confirmDonation.goalId === g.id ? 'grid-cols-1' : 'grid-cols-4'} gap-3 mb-3`}>
+                      {(!confirmDonation || confirmDonation.goalId !== g.id || confirmDonation.percent === 10) && renderDonateBtn(10, 'bg-cyan-500/10 border-cyan-400/30 text-cyan-400 hover:bg-cyan-500/20', 'border-cyan-400/30', '10%')}
+                      {(!confirmDonation || confirmDonation.goalId !== g.id || confirmDonation.percent === 25) && renderDonateBtn(25, 'bg-indigo-500/10 border-indigo-400/30 text-indigo-400 hover:bg-indigo-500/20', 'border-indigo-400/30', '25%')}
+                      {(!confirmDonation || confirmDonation.goalId !== g.id || confirmDonation.percent === 50) && renderDonateBtn(50, 'bg-purple-500/10 border-purple-400/30 text-purple-400 hover:bg-purple-500/20', 'border-purple-400/30', '50%')}
+                      {(!confirmDonation || confirmDonation.goalId !== g.id || confirmDonation.percent === 100) && renderDonateBtn(100, 'bg-pink-500/10 border-pink-400/30 text-pink-400 hover:bg-pink-500/20', 'border-pink-400/30', '100%')}
                     </div>
                     <div className="flex items-center justify-end">
                       <button
                         className="text-[11px] px-2 py-1 rounded border border-white/10 text-gray-400 hover:text-gray-200 hover:border-white/20"
-                        onClick={() => setShowTopDonors(prev => ({ ...prev, [g.id]: !prev[g.id] }))}
+                        onClick={() => {
+                          const next = !selected;
+                          setShowTopDonors(prev => ({ ...prev, [g.id]: next }));
+                          if (next) {
+                            fetchDonationGoalDetail(g.id);
+                          }
+                        }}
                       >
                         {selected ? 'Hide top donors' : 'Show top donors'}
                       </button>
