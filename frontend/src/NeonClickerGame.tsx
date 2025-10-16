@@ -6,6 +6,11 @@ import LeaderboardItem from './components/LeaderboardItem';
 import DonationItem from './components/DonationItem';
 import PowerUpgradeCard from './components/PowerUpgradeCard';
 import { formatTime, formatCompact, formatPercent } from './utils/format';
+import GameHeaderStats from './components/GameHeaderStats';
+import LeaderboardTabs from './components/LeaderboardTabs';
+import TabsBar from './components/TabsBar';
+import AnimatedBackground from './components/AnimatedBackground';
+import QuickAccessProducers from './components/QuickAccessProducers';
 
 export default function NeonClickerGame() {
   // ==== BACKEND INTEGRATION BLOCK ====
@@ -746,135 +751,21 @@ export default function NeonClickerGame() {
 
   return (
     <div className="min-h-screen bg-black text-white relative">
-      {/* Animated Background */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-cyan-500/20 rounded-full blur-3xl" style={{
-          animation: 'pulse-slow 8s ease-in-out infinite'
-        }}></div>
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl" style={{
-          animation: 'pulse-slow 8s ease-in-out infinite',
-          animationDelay: '2s'
-        }}></div>
-        <div className="absolute top-1/2 left-1/2 w-96 h-96 bg-pink-500/10 rounded-full blur-3xl" style={{
-          animation: 'pulse-slow 8s ease-in-out infinite',
-          animationDelay: '4s'
-        }}></div>
-      </div>
-
-      {/* Grid Pattern Overlay */}
-      <div className="fixed inset-0 pointer-events-none opacity-10" style={{
-        backgroundImage: 'linear-gradient(rgba(6, 182, 212, 0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(6, 182, 212, 0.1) 1px, transparent 1px)',
-        backgroundSize: '50px 50px'
-      }}></div>
+      <AnimatedBackground />
 
       {/* Content */}
       <div className="relative z-10">
         {/* Header */}
-        <div className="border-b border-cyan-500/20 bg-black/80">
-          <div className="max-w-6xl mx-auto px-4 sm:px-8 py-6 flex items-center justify-between">
-            <div>
-              <div className="text-sm font-light tracking-widest text-cyan-400 mb-1">NEON CLICKER</div>
-              <div className="flex items-center gap-3">
-                {totalProduction > 0 && (
-                  <div className="flex items-center gap-2">
-                    <div className="relative">
-                      <svg 
-                        width="16" 
-                        height="16" 
-                        viewBox="0 0 24 24" 
-                        fill="none" 
-                        className="text-cyan-400 drop-shadow-[0_0_4px_rgba(6,182,212,0.8)] animate-pulse"
-                        style={{
-                          filter: 'drop-shadow(0 0 2px #06b6d4) drop-shadow(0 0 4px #06b6d4) drop-shadow(0 0 6px #06b6d4)',
-                          animation: 'neon-flicker 2s ease-in-out infinite alternate',
-                        }}
-                      >
-                        <path 
-                          d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" 
-                          fill="currentColor"
-                          stroke="currentColor"
-                          strokeWidth="0.5"
-                        />
-                      </svg>
-                </div>
-                    <div className={`text-xs font-light tracking-widest transition-all duration-300 ${isHighlighted ? 'text-cyan-400 scale-125 font-semibold' : 'text-cyan-400'}`} style={{
-                      textShadow: '0 0 2px #06b6d4, 0 0 4px #06b6d4'
-                    }}>
-                      +{totalProduction.toLocaleString()}/sec
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="text-right">
-              <div className="flex items-center justify-end gap-2 mb-1">
-                <div className="relative">
-                  <svg 
-                    width="24" 
-                    height="24" 
-                    viewBox="0 0 24 24" 
-                    fill="none" 
-                    className="text-cyan-400 drop-shadow-[0_0_8px_rgba(6,182,212,0.8)] animate-pulse"
-                    style={{
-                      filter: 'drop-shadow(0 0 4px #06b6d4) drop-shadow(0 0 8px #06b6d4) drop-shadow(0 0 12px #06b6d4)',
-                      animation: 'neon-flicker 2s ease-in-out infinite alternate',
-                    }}
-                  >
-                    <path 
-                      d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" 
-                      fill="currentColor"
-                      stroke="currentColor"
-                      strokeWidth="0.5"
-                    />
-                  </svg>
-                </div>
-                <div className="text-xs text-cyan-400 font-light tracking-widest drop-shadow-[0_0_4px_rgba(6,182,212,0.6)]" style={{
-                  textShadow: '0 0 4px #06b6d4, 0 0 8px #06b6d4'
-                }}>NEON POWER</div>
-              </div>
-              <div className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-mono font-bold text-cyan-400 break-all">
-                {loading ? Math.floor(prevScore).toLocaleString() : Math.floor(displayScore).toLocaleString()}
-              </div>
-            </div>
-          </div>
-        </div>
+        <GameHeaderStats
+          totalProduction={totalProduction}
+          isHighlighted={isHighlighted}
+          loading={loading}
+          prevScore={prevScore}
+          displayScore={displayScore}
+        />
 
         {/* Tabs */}
-        <div className="max-w-6xl mx-auto px-4 sm:px-8 mt-6 sm:mt-8 mb-4 sm:mb-6">
-          <div className="flex justify-center sm:justify-start gap-5 sm:gap-8 border-b border-white/10">
-            {[
-              { id: 'game', label: 'TAP', icon: Zap },
-              { id: 'shop', label: 'PRODUCE', icon: ShoppingCart },
-              { id: 'donations', label: 'DONATE', icon: Trophy },
-              { id: 'leaderboard', label: 'RANKS' }
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`pb-2 sm:pb-3 text-xs sm:text-sm font-light tracking-normal sm:tracking-wide transition-all relative flex items-center gap-2 sm:gap-2 ${
-                  activeTab === tab.id
-                    ? 'text-cyan-400'
-                    : 'text-gray-500 hover:text-gray-300'
-                }`}
-              >
-                {tab.id === 'leaderboard' ? (
-                  <span className="relative inline-flex items-center gap-2">
-                    <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse shadow-[0_0_8px_rgba(74,222,128,0.8)]"></span>
-                    {tab.label}
-                  </span>
-                ) : (
-                  <>
-                    {tab.icon && <tab.icon className="w-4 h-4" strokeWidth={1.5} />}
-                    {tab.label}
-                  </>
-                )}
-                {activeTab === tab.id && (
-                  <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-400 to-transparent"></div>
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
+        <TabsBar activeTab={activeTab as any} onSelect={(tab) => setActiveTab(tab)} />
 
         {/* Main Content */}
         <div className="max-w-6xl mx-auto px-8 py-12 pb-20">
@@ -924,19 +815,12 @@ export default function NeonClickerGame() {
               </div>
 
               {/* Quick Producers Preview */}
-              <div className="space-y-4">
-                <div className="text-xs font-light tracking-widest text-gray-500 mb-4">QUICK ACCESS</div>
-                 {producers.slice(0, 3).map(producer => (
-                   <ProducerItem
-                     key={producer.id}
-                     producer={producer}
-                     score={score}
-                     onBuy={buyProducer}
-                     formatTime={formatTime}
-                     compact
-                   />
-                 ))}
-              </div>
+              <QuickAccessProducers
+                producers={producers}
+                score={score}
+                onBuy={buyProducer}
+                formatTime={formatTime}
+              />
             </div>
           )}
 
@@ -1026,50 +910,7 @@ export default function NeonClickerGame() {
           {activeTab === 'leaderboard' && (
             <div className="max-w-2xl mx-auto space-y-4">
               {/* Toggle switch */}
-              <div className="flex items-center justify-center gap-2 mb-6">
-                  <button 
-                    className={`px-3 py-1 rounded text-xs transition-all duration-200 ${
-                      leaderboardMode === 'richest' 
-                        ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-400/30' 
-                        : 'text-gray-500 hover:text-gray-400'
-                    }`}
-                    onClick={() => {
-                      if (leaderboardMode !== 'richest') {
-                        setLeaderboardMode('richest');
-                      }
-                    }}
-                  >
-                    RICHEST
-                  </button>
-                  <button 
-                    className={`px-3 py-1 rounded text-xs transition-all duration-200 ${
-                      leaderboardMode === 'per_second' 
-                        ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-400/30' 
-                        : 'text-gray-500 hover:text-gray-400'
-                    }`}
-                    onClick={() => {
-                      if (leaderboardMode !== 'per_second') {
-                        setLeaderboardMode('per_second');
-                      }
-                    }}
-                  >
-                    PER SECOND
-                  </button>
-                  <button 
-                    className={`px-3 py-1 rounded text-xs transition-all duration-200 ${
-                      leaderboardMode === 'clicks' 
-                        ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-400/30' 
-                        : 'text-gray-500 hover:text-gray-400'
-                    }`}
-                    onClick={() => {
-                      if (leaderboardMode !== 'clicks') {
-                        setLeaderboardMode('clicks');
-                      }
-                    }}
-                  >
-                    CLICKS
-                  </button>
-              </div>
+              <LeaderboardTabs mode={leaderboardMode} onChange={setLeaderboardMode} />
               
               {!leaderboardLoading && leaderboardMode === 'richest' && hasInitiallyLoadedRichest && leaderboard.length === 0 && (
                 <div className="text-center text-gray-500">No leaders yet.</div>
