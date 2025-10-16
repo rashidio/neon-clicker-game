@@ -879,7 +879,7 @@ export default function NeonClickerGame() {
 
         {/* Tabs */}
         <div className="max-w-6xl mx-auto px-4 sm:px-8 mt-6 sm:mt-8 mb-4 sm:mb-6">
-          <div className="flex gap-5 sm:gap-8 border-b border-white/10">
+          <div className="flex justify-center sm:justify-start gap-5 sm:gap-8 border-b border-white/10">
             {[
               { id: 'game', label: 'TAP', icon: Zap },
               { id: 'shop', label: 'PRODUCE', icon: ShoppingCart },
