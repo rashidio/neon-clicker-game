@@ -3,6 +3,7 @@ import { Trophy, Zap, ShoppingCart, Clock, Timer, Check } from 'lucide-react';
 import { retrieveLaunchParams } from '@telegram-apps/sdk';
 import ProducerItem from './components/ProducerItem';
 import LeaderboardItem from './components/LeaderboardItem';
+import DonationItem from './components/DonationItem';
 
 export default function NeonClickerGame() {
   // ==== BACKEND INTEGRATION BLOCK ====
@@ -1077,121 +1078,25 @@ export default function NeonClickerGame() {
                 <div className="text-center text-gray-500">No goals.</div>
               )}
               {!donationsLoading && donationGoals.map(g => {
-                const rawPercent = Number(g.percent || 0);
-                const percentBar = Math.max(0, Math.min(100, rawPercent));
-                const percentLabel = formatPercent(rawPercent);
                 const selected = !!showTopDonors[g.id];
-                const renderDonateBtn = (p: 10 | 25 | 50 | 100, color: string, border: string, text: string) => {
-                  const isConfirm = confirmDonation && confirmDonation.goalId === g.id && confirmDonation.percent === p;
-                  const isSubmitting = donationSubmitting && donationSubmitting.goalId === g.id && donationSubmitting.percent === p;
-                  const isSuccess = donationSuccess && donationSuccess.goalId === g.id && donationSuccess.percent === p;
-                  const baseClasses = `${isConfirm ? 'w-full' : ''} py-2 text-xs rounded-xl font-light tracking-widest border ${border} flex items-center justify-center gap-2`;
-                  const confirmedClasses = 'bg-green-500/20 border border-green-400/40 text-green-400';
-                  const normalClasses = `${color}`;
-                  const donateAmount = Math.floor((score * p) / 100);
-                  const disabled = donateAmount <= 0 || !!isSubmitting;
-                  return (
-                    <button
-                      key={p}
-                      disabled={disabled}
-                      onClick={() => {
-                        if (disabled) return;
-                        if (isConfirm) {
-                          donate(g.id, p);
-                        } else {
-                          setConfirmDonation({ goalId: g.id, percent: p });
-                          setTimeout(() => {
-                            setConfirmDonation(prev => (prev && prev.goalId === g.id && prev.percent === p ? null : prev));
-                          }, 2500);
-                        }
-                      }}
-                      className={`${baseClasses} ${disabled && !isConfirm ? 'opacity-40 cursor-not-allowed bg-white/5 text-gray-500 border-white/10' : (isConfirm ? confirmedClasses : normalClasses)}`}
-                    >
-                      {isConfirm ? (
-                        isSubmitting ? (
-                          <>Donating...</>
-                        ) : isSuccess ? (
-                          <>
-                            <Check className="w-4 h-4" />
-                            Donated!
-                          </>
-                        ) : (
-                          <>
-                            <Check className="w-4 h-4" />
-                            Donate {formatCompact(donateAmount)}?
-                          </>
-                        )
-                      ) : (
-                        text
-                      )}
-                    </button>
-                  );
-                };
                 return (
-                  <div key={g.id} className="bg-gradient-to-br from-white/5 to-white/0 backdrop-blur-sm border border-white/10 rounded-2xl p-6 hover:border-cyan-500/30 transition-all duration-300">
-                    <div className="flex items-center justify-between mb-3">
-                      <div>
-                        <div className="text-sm text-white font-light">{g.name}</div>
-                        <div className="text-xs text-gray-500">Target {formatCompact(g.target)}</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <div className="text-xl font-extralight text-cyan-400">{percentLabel}</div>
-                          {rawPercent >= 100 && (
-                            <span className="px-2 py-0.5 rounded bg-green-500/20 border border-green-400/30 text-green-400 text-[10px] uppercase tracking-widest">done!</span>
-                          )}
-                        </div>
-                        <div className="text-xs text-gray-500">{formatCompact(g.total_donated || 0)}</div>
-                      </div>
-                    </div>
-                    <div className="relative w-full h-2 bg-white/10 rounded-full overflow-hidden mb-4">
-                      <div className="absolute inset-0 neon-scan"></div>
-                      <div className="relative h-full bg-cyan-500/60" style={{ width: `${percentBar}%` }}></div>
-                    </div>
-                    <div className={`grid ${confirmDonation && confirmDonation.goalId === g.id ? 'grid-cols-1' : 'grid-cols-4'} gap-3 mb-3`}>
-                      {(!confirmDonation || confirmDonation.goalId !== g.id || confirmDonation.percent === 10) && renderDonateBtn(10, 'bg-cyan-500/10 border-cyan-400/30 text-cyan-400 hover:bg-cyan-500/20', 'border-cyan-400/30', '10%')}
-                      {(!confirmDonation || confirmDonation.goalId !== g.id || confirmDonation.percent === 25) && renderDonateBtn(25, 'bg-indigo-500/10 border-indigo-400/30 text-indigo-400 hover:bg-indigo-500/20', 'border-indigo-400/30', '25%')}
-                      {(!confirmDonation || confirmDonation.goalId !== g.id || confirmDonation.percent === 50) && renderDonateBtn(50, 'bg-purple-500/10 border-purple-400/30 text-purple-400 hover:bg-purple-500/20', 'border-purple-400/30', '50%')}
-                      {(!confirmDonation || confirmDonation.goalId !== g.id || confirmDonation.percent === 100) && renderDonateBtn(100, 'bg-pink-500/10 border-pink-400/30 text-pink-400 hover:bg-pink-500/20', 'border-pink-400/30', '100%')}
-                    </div>
-                    <div className="flex items-center justify-end">
-                      <button
-                        className="text-[11px] px-2 py-1 rounded border border-white/10 text-gray-400 hover:text-gray-200 hover:border-white/20"
-                        onClick={() => {
-                          const next = !selected;
-                          setShowTopDonors(prev => ({ ...prev, [g.id]: next }));
-                          if (next) {
-                            fetchDonationGoalDetail(g.id);
-                          }
-                        }}
-                      >
-                        {selected ? 'Hide top donors' : 'Show top donors'}
-                      </button>
-                    </div>
-                    {selected && (
-                      <div className="mt-3 space-y-2">
-                        {detailLoading[g.id] && (
-                          <div className="text-xs text-gray-500">Loading...</div>
-                        )}
-                        {!detailLoading[g.id] && donationDetails[g.id] && (
-                          <>
-                            {(donationDetails[g.id].top_donors || []).length === 0 && (
-                              <div className="text-xs text-gray-400 italic">No donors yet.</div>
-                            )}
-                            {(donationDetails[g.id].top_donors || []).slice(0,5).map((d: any, i: number) => (
-                              <div key={i} className={`flex items-center justify-between bg-gradient-to-br from-white/5 to-white/0 backdrop-blur-sm border border-white/10 rounded-xl p-3 ${i===0?'border-yellow-400/30':'hover:border-cyan-500/30'} transition-all`}>
-                                <div className="flex items-center gap-3">
-                                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-light ${i===0?'bg-yellow-400/20 text-yellow-300 border border-yellow-400/30':'bg-white/5 text-gray-400 border border-white/10'}`}>{i+1}</div>
-                                  <div className="font-light text-gray-300">{d.user_id}</div>
-                                </div>
-                                <div className="text-cyan-400">{Number(d.amount).toLocaleString()}</div>
-                              </div>
-                            ))}
-                          </>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                  <DonationItem
+                    key={g.id}
+                    goal={g}
+                    selected={selected}
+                    detailLoading={!!detailLoading[g.id]}
+                    detail={donationDetails[g.id]}
+                    onToggleTopDonors={(goalId, next) => setShowTopDonors(prev => ({ ...prev, [goalId]: next }))}
+                    onRequestDetail={fetchDonationGoalDetail}
+                    confirm={confirmDonation}
+                    submitting={donationSubmitting}
+                    success={donationSuccess}
+                    setConfirm={setConfirmDonation}
+                    onDonate={donate}
+                    score={score}
+                    formatCompact={formatCompact}
+                    formatPercent={formatPercent}
+                  />
                 );
               })}
             </div>
