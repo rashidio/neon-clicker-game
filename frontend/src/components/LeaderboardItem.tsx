@@ -1,10 +1,11 @@
 import React from 'react';
+import { LeaderboardEntryRichest, LeaderboardEntryPerSecond, LeaderboardEntryClicks } from '../types';
 
 export type LeaderboardMode = 'richest' | 'per_second' | 'clicks';
 
 export interface LeaderboardItemProps {
   index: number;
-  entry: any;
+  entry: LeaderboardEntryRichest | LeaderboardEntryPerSecond | LeaderboardEntryClicks;
   mode: LeaderboardMode;
 }
 
@@ -28,19 +29,19 @@ const LeaderboardItem: React.FC<LeaderboardItemProps> = ({ index, entry, mode })
   if (mode === 'richest') {
     right = (
       <div className="text-2xl font-extralight text-cyan-400">
-        {Number(entry.score || 0).toLocaleString()}
+        {Number((entry as LeaderboardEntryRichest).score || 0).toLocaleString()}
       </div>
     );
   } else if (mode === 'per_second') {
     right = (
       <div className="text-2xl font-extralight text-green-400">
-        +{Number(entry.production_rate || 0).toLocaleString()}/s
+        +{Number((entry as LeaderboardEntryPerSecond).production_rate || 0).toLocaleString()}/s
       </div>
     );
   } else {
     right = (
       <div className="text-2xl font-extralight text-purple-400">
-        {Number(entry.clicks || 0).toLocaleString()}
+        {Number((entry as LeaderboardEntryClicks).clicks || 0).toLocaleString()}
       </div>
     );
   }

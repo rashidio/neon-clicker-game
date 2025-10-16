@@ -1,10 +1,11 @@
 import React from 'react';
 import ProducerItem from './ProducerItem';
+import { Producer } from '../types';
 
 interface QuickAccessProducersProps {
-  producers: any[];
+  producers: Producer[];
   score: number;
-  onBuy: (producer: any) => void;
+  onBuy: (producer: Producer) => void;
   formatTime: (seconds: number) => string;
 }
 

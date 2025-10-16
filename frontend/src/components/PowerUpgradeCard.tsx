@@ -1,13 +1,6 @@
 import React from 'react';
 import { Clock, Timer } from 'lucide-react';
-
-export interface PowerInfo {
-  power: number;
-  price?: number;
-  build_time: number;
-  is_building: boolean;
-  build_time_left: number;
-}
+import { PowerInfo } from '../types';
 
 export interface PowerUpgradeCardProps {
   powerInfo: PowerInfo;

@@ -1,22 +1,11 @@
 import React from 'react';
 import { Clock, Timer } from 'lucide-react';
-
-export type Producer = {
-  id: number | string;
-  name: string;
-  emoji: string;
-  rate: number;
-  owned: number;
-  cost: number;
-  build_time: number;
-  build_time_left: number;
-  is_building: boolean;
-};
+import { Producer } from '../types';
 
 export interface ProducerItemProps {
-  producer: any;
+  producer: Producer;
   score: number;
-  onBuy: (producer: any) => void;
+  onBuy: (producer: Producer) => void;
   formatTime: (seconds: number) => string;
   compact?: boolean;
 }

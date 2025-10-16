@@ -1,19 +1,23 @@
 import React from 'react';
 import { Check, Timer } from 'lucide-react';
-
-export type DonationPercent = 10 | 25 | 50 | 100;
+import {
+  DonationGoal,
+  DonationGoalDetail,
+  DonationConfirmState,
+  DonationPercent,
+} from '../types';
 
 export interface DonationItemProps {
-  goal: any;
+  goal: DonationGoal;
   selected: boolean;
   detailLoading: boolean;
-  detail: any;
+  detail: DonationGoalDetail | undefined;
   onToggleTopDonors: (goalId: number, next: boolean) => void;
   onRequestDetail: (goalId: number) => void;
-  confirm: { goalId: number; percent: DonationPercent } | null;
-  submitting: { goalId: number; percent: DonationPercent } | null;
-  success: { goalId: number; percent: DonationPercent } | null;
-  setConfirm: (c: { goalId: number; percent: DonationPercent } | null) => void;
+  confirm: DonationConfirmState | null;
+  submitting: DonationConfirmState | null;
+  success: DonationConfirmState | null;
+  setConfirm: (c: DonationConfirmState | null) => void;
   onDonate: (goalId: number, percent: DonationPercent) => void;
   score: number;
   formatCompact: (n: number) => string;
@@ -65,7 +69,7 @@ const DonationItem: React.FC<DonationItemProps> = ({
           } else {
             setConfirm({ goalId: goal.id, percent: p });
             setTimeout(() => {
-              setConfirm(prev => (prev && (prev as any).goalId === goal.id && (prev as any).percent === p ? null : prev));
+              setConfirm(prev => (prev && prev.goalId === goal.id && prev.percent === p ? null : prev));
             }, 2500);
           }
         }}
@@ -143,7 +147,7 @@ const DonationItem: React.FC<DonationItemProps> = ({
               {(detail.top_donors || []).length === 0 && (
                 <div className="text-xs text-gray-400 italic">No donors yet.</div>
               )}
-              {(detail.top_donors || []).slice(0, 5).map((d: any, i: number) => (
+              {(detail.top_donors || []).slice(0, 5).map((d, i) => (
                 <div
                   key={i}
                   className={`flex items-center justify-between bg-gradient-to-br from-white/5 to-white/0 backdrop-blur-sm border border-white/10 rounded-xl p-3 ${i === 0 ? 'border-yellow-400/30' : 'hover:border-cyan-500/30'} transition-all`}
