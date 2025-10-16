@@ -1,6 +1,25 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Trophy, Zap, ShoppingCart, Clock, Timer } from 'lucide-react';
+import { Zap } from 'lucide-react';
 import { retrieveLaunchParams } from '@telegram-apps/sdk';
+import ProducerItem from './components/ProducerItem';
+import LeaderboardItem from './components/LeaderboardItem';
+import DonationItem from './components/DonationItem';
+import PowerUpgradeCard from './components/PowerUpgradeCard';
+import { formatTime, formatCompact, formatPercent } from './utils/format';
+import GameHeaderStats from './components/GameHeaderStats';
+import LeaderboardTabs from './components/LeaderboardTabs';
+import TabsBar from './components/TabsBar';
+import AnimatedBackground from './components/AnimatedBackground';
+import QuickAccessProducers from './components/QuickAccessProducers';
+import {
+  Producer,
+  LeaderboardEntryRichest,
+  LeaderboardEntryPerSecond,
+  LeaderboardEntryClicks,
+  DonationGoal,
+  DonationGoalDetail,
+  DonationConfirmState,
+} from './types';
 
 export default function NeonClickerGame() {
   // ==== BACKEND INTEGRATION BLOCK ====
@@ -37,7 +56,7 @@ export default function NeonClickerGame() {
           language_code: "en",
           is_premium: false
         };
-        
+
         const mockInitData = new URLSearchParams({
           user: JSON.stringify(mockUser),
           auth_date: Math.floor(Date.now() / 1000).toString(),
@@ -425,27 +444,63 @@ export default function NeonClickerGame() {
   };
 
   const [displayScore, setDisplayScore] = useState(0);
-  const [clickPower, setClickPower] = useState(1);
   const [activeTab, setActiveTab] = useState('game');
-  const [gas, setGas] = useState(500);
-  const [autoTapActive, setAutoTapActive] = useState(false);
-  const [boostActive, setBoostActive] = useState(false);
-  const [boostTimeLeft, setBoostTimeLeft] = useState(0);
-  const boostMultiplier = boostActive ? 2 : 1;
   const [clicks, setClicks] = useState([]);
-  const [producers, setProducers] = useState([]);
+  const [producers, setProducers] = useState<Producer[]>([]);
   const [producersLoading, setProducersLoading] = useState(true);
   const [isHighlighted, setIsHighlighted] = useState(false);
   const [prevTotalProduction, setPrevTotalProduction] = useState(0);
+  const tabsOrder: Array<'game' | 'shop' | 'donations' | 'leaderboard'> = ['game', 'shop', 'donations', 'leaderboard'];
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
+  const touchActive = useRef(false);
+  const swipeConsumed = useRef(false);
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const t = e.touches[0];
+    touchStartX.current = t.clientX;
+    touchStartY.current = t.clientY;
+    touchActive.current = true;
+    swipeConsumed.current = false;
+  };
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!touchActive.current || swipeConsumed.current) return;
+    const t = e.touches[0];
+    const dx = t.clientX - touchStartX.current;
+    const dy = t.clientY - touchStartY.current;
+    if (Math.abs(dx) < 50) return;
+    if (Math.abs(dx) <= Math.abs(dy)) return;
+    const idx = tabsOrder.indexOf(activeTab as any);
+    if (dx < 0) {
+      const next = tabsOrder[(idx + 1) % tabsOrder.length];
+      setActiveTab(next);
+    } else {
+      const prev = tabsOrder[(idx - 1 + tabsOrder.length) % tabsOrder.length];
+      setActiveTab(prev);
+    }
+    swipeConsumed.current = true;
+  };
+  const handleTouchEnd = () => {
+    touchActive.current = false;
+    swipeConsumed.current = false;
+  };
   // Replace and extend hardcoded leaderboard
-  const [leaderboard, setLeaderboard] = useState<any[]>([]);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntryRichest[]>([]);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [leaderboardMode, setLeaderboardMode] = useState<'richest' | 'per_second' | 'clicks'>('richest');
-  const [perSecondLeaderboard, setPerSecondLeaderboard] = useState<any[]>([]);
-  const [clicksLeaderboard, setClicksLeaderboard] = useState<any[]>([]);
+  const [perSecondLeaderboard, setPerSecondLeaderboard] = useState<LeaderboardEntryPerSecond[]>([]);
+  const [clicksLeaderboard, setClicksLeaderboard] = useState<LeaderboardEntryClicks[]>([]);
   const [hasInitiallyLoadedRichest, setHasInitiallyLoadedRichest] = useState(false);
   const [hasInitiallyLoadedPerSecond, setHasInitiallyLoadedPerSecond] = useState(false);
   const [hasInitiallyLoadedClicks, setHasInitiallyLoadedClicks] = useState(false);
+  const [donationGoals, setDonationGoals] = useState<DonationGoal[]>([]);
+  const [donationsLoading, setDonationsLoading] = useState(false);
+  const [selectedDonationGoalId, setSelectedDonationGoalId] = useState<number | null>(null);
+  const [donationDetails, setDonationDetails] = useState<Record<number, DonationGoalDetail>>({});
+  const [detailLoading, setDetailLoading] = useState<Record<number, boolean>>({});
+  const [showTopDonors, setShowTopDonors] = useState<Record<number, boolean>>({});
+  const [confirmDonation, setConfirmDonation] = useState<DonationConfirmState | null>(null);
+  const [donationSubmitting, setDonationSubmitting] = useState<DonationConfirmState | null>(null);
+  const [donationSuccess, setDonationSuccess] = useState<DonationConfirmState | null>(null);
   
   
   // Fetch leaderboard from backend
@@ -492,6 +547,67 @@ export default function NeonClickerGame() {
       });
   }, [isInitialized, userId, isTelegramContext, sessionId, initData]);
 
+  const fetchDonationGoals = React.useCallback((silent = false) => {
+    if (!isInitialized || !userId) return;
+    if (!silent) setDonationsLoading(true);
+    makeAuthenticatedRequest('/api/donations/goals')
+      .then(res => res.json())
+      .then(data => {
+        setDonationGoals(Array.isArray(data) ? data : []);
+      })
+      .catch(() => setDonationGoals([]))
+      .finally(() => {
+        if (!silent) setDonationsLoading(false);
+      });
+  }, [isInitialized, userId, sessionId, initData]);
+
+  const fetchDonationGoalDetail = React.useCallback((goalId: number) => {
+    if (!isInitialized || !userId) return;
+    setDetailLoading(prev => ({ ...prev, [goalId]: true }));
+    makeAuthenticatedRequest(`/api/donations/goal?id=${goalId}`)
+      .then(res => res.json())
+      .then(data => {
+        setSelectedDonationGoalId(goalId);
+        setDonationDetails(prev => ({ ...prev, [goalId]: data }));
+      })
+      .finally(() => setDetailLoading(prev => ({ ...prev, [goalId]: false })));
+  }, [isInitialized, userId, sessionId, initData]);
+
+  const donate = async (goalId: number, percent: 10 | 25 | 50 | 100) => {
+    if (!isInitialized || !userId) return;
+    try {
+      // keep the confirm button on screen; mark as submitting
+      setDonationSubmitting({ goalId, percent });
+      const res = await makeAuthenticatedRequest('/api/donations/donate', {
+        method: 'POST',
+        body: JSON.stringify({ goal_id: goalId, percent })
+      });
+      const result = await res.json();
+      if (result.success) {
+        setScore(result.score ?? score);
+        fetchDonationGoals(true);
+        if (selectedDonationGoalId === goalId) {
+          setDonationDetails(prev => ({ ...prev, [goalId]: result.goal }));
+        }
+        // silently refresh richest leaderboard after donation
+        fetchLeaderboard(true);
+        // show success on the same confirmation button, then revert
+        setDonationSubmitting(null);
+        setDonationSuccess({ goalId, percent });
+        setTimeout(() => {
+          setDonationSuccess(prev => (prev && prev.goalId === goalId ? null : prev));
+          setConfirmDonation(prev => (prev && prev.goalId === goalId ? null : prev));
+        }, 500);
+      } else {
+        setDonationSubmitting(null);
+        setError(result.message || 'Donation failed');
+      }
+    } catch {
+      setDonationSubmitting(null);
+      setError('Donation failed');
+    }
+  };
+
   // Fetch clicks leaderboard from backend
   const fetchClicksLeaderboard = React.useCallback((silent = false) => {
     if (!isInitialized || !userId) return;
@@ -521,6 +637,24 @@ export default function NeonClickerGame() {
       setHasInitiallyLoadedClicks(false);
     }
   }, [activeTab]);
+
+  // Auto-load donation goals when opening the Donations tab
+  useEffect(() => {
+    if (activeTab !== 'donations') return;
+    if (!isInitialized || !userId) return;
+    fetchDonationGoals();
+  }, [activeTab, isInitialized, userId, fetchDonationGoals]);
+
+  // Auto-fetch donors for all goals once goals are loaded (cache per goal)
+  useEffect(() => {
+    if (activeTab !== 'donations') return;
+    if (!donationGoals || donationGoals.length === 0) return;
+    donationGoals.forEach(g => {
+      if (!donationDetails[g.id] && !detailLoading[g.id]) {
+        fetchDonationGoalDetail(g.id);
+      }
+    });
+  }, [activeTab, donationGoals, donationDetails, detailLoading, fetchDonationGoalDetail]);
 
   // Initial leaderboard fetch when tab is opened
   useEffect(() => {
@@ -640,26 +774,7 @@ export default function NeonClickerGame() {
 
   const totalProduction = producers.reduce((sum, p) => sum + (p.rate * p.owned), 0);
 
-  // Helper function to format time
-  const formatTime = (seconds) => {
-    if (seconds < 60) {
-      return `${seconds}s`;
-    } else if (seconds < 3600) {
-      // Less than 1 hour: show MM:SS
-      const minutes = Math.floor(seconds / 60);
-      const remainingSeconds = seconds % 60;
-      return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-    } else {
-      // 1 hour or more: show H:MM or HH:MM
-      const hours = Math.floor(seconds / 3600);
-      const minutes = Math.floor((seconds % 3600) / 60);
-      if (hours < 10) {
-        return `${hours}:${minutes.toString().padStart(2, '0')}h`;
-      } else {
-        return `${hours}h ${minutes}m`;
-      }
-    }
-  };
+  // formatTime, formatCompact, formatPercent imported from utils/format
 
   // Detect when total production changes and trigger highlight
   useEffect(() => {
@@ -672,128 +787,29 @@ export default function NeonClickerGame() {
 
   return (
     <div className="min-h-screen bg-black text-white relative">
-      {/* Animated Background */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-cyan-500/20 rounded-full blur-3xl" style={{
-          animation: 'pulse-slow 8s ease-in-out infinite'
-        }}></div>
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl" style={{
-          animation: 'pulse-slow 8s ease-in-out infinite',
-          animationDelay: '2s'
-        }}></div>
-        <div className="absolute top-1/2 left-1/2 w-96 h-96 bg-pink-500/10 rounded-full blur-3xl" style={{
-          animation: 'pulse-slow 8s ease-in-out infinite',
-          animationDelay: '4s'
-        }}></div>
-      </div>
-
-      {/* Grid Pattern Overlay */}
-      <div className="fixed inset-0 pointer-events-none opacity-10" style={{
-        backgroundImage: 'linear-gradient(rgba(6, 182, 212, 0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(6, 182, 212, 0.1) 1px, transparent 1px)',
-        backgroundSize: '50px 50px'
-      }}></div>
+      <AnimatedBackground />
 
       {/* Content */}
       <div className="relative z-10">
         {/* Header */}
-        <div className="border-b border-cyan-500/20 bg-black/80">
-          <div className="max-w-6xl mx-auto px-4 sm:px-8 py-6 flex items-center justify-between">
-            <div>
-              <div className="text-sm font-light tracking-widest text-cyan-400 mb-1">NEON CLICKER</div>
-              <div className="flex items-center gap-3">
-                {totalProduction > 0 && (
-                  <div className="flex items-center gap-2">
-                    <div className="relative">
-                      <svg 
-                        width="16" 
-                        height="16" 
-                        viewBox="0 0 24 24" 
-                        fill="none" 
-                        className="text-cyan-400 drop-shadow-[0_0_4px_rgba(6,182,212,0.8)] animate-pulse"
-                        style={{
-                          filter: 'drop-shadow(0 0 2px #06b6d4) drop-shadow(0 0 4px #06b6d4) drop-shadow(0 0 6px #06b6d4)',
-                          animation: 'neon-flicker 2s ease-in-out infinite alternate',
-                        }}
-                      >
-                        <path 
-                          d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" 
-                          fill="currentColor"
-                          stroke="currentColor"
-                          strokeWidth="0.5"
-                        />
-                      </svg>
-                </div>
-                    <div className={`text-xs font-light tracking-widest transition-all duration-300 ${isHighlighted ? 'text-cyan-400 scale-125 font-semibold' : 'text-cyan-400'}`} style={{
-                      textShadow: '0 0 2px #06b6d4, 0 0 4px #06b6d4'
-                    }}>
-                      +{totalProduction.toLocaleString()}/sec
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="text-right">
-              <div className="flex items-center justify-end gap-2 mb-1">
-                <div className="relative">
-                  <svg 
-                    width="24" 
-                    height="24" 
-                    viewBox="0 0 24 24" 
-                    fill="none" 
-                    className="text-cyan-400 drop-shadow-[0_0_8px_rgba(6,182,212,0.8)] animate-pulse"
-                    style={{
-                      filter: 'drop-shadow(0 0 4px #06b6d4) drop-shadow(0 0 8px #06b6d4) drop-shadow(0 0 12px #06b6d4)',
-                      animation: 'neon-flicker 2s ease-in-out infinite alternate',
-                    }}
-                  >
-                    <path 
-                      d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" 
-                      fill="currentColor"
-                      stroke="currentColor"
-                      strokeWidth="0.5"
-                    />
-                  </svg>
-                </div>
-                <div className="text-xs text-cyan-400 font-light tracking-widest drop-shadow-[0_0_4px_rgba(6,182,212,0.6)]" style={{
-                  textShadow: '0 0 4px #06b6d4, 0 0 8px #06b6d4'
-                }}>NEON POWER</div>
-              </div>
-              <div className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-mono font-bold text-cyan-400 break-all">
-                {loading ? Math.floor(prevScore).toLocaleString() : Math.floor(displayScore).toLocaleString()}
-              </div>
-            </div>
-          </div>
-        </div>
+        <GameHeaderStats
+          totalProduction={totalProduction}
+          isHighlighted={isHighlighted}
+          loading={loading}
+          prevScore={prevScore}
+          displayScore={displayScore}
+        />
 
         {/* Tabs */}
-        <div className="max-w-6xl mx-auto px-8 mt-8">
-          <div className="flex gap-8 border-b border-white/10">
-            {[
-              { id: 'game', label: 'PLAY', icon: Zap },
-              { id: 'shop', label: 'PRODUCERS', icon: ShoppingCart },
-              { id: 'leaderboard', label: 'RANKS', icon: Trophy }
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`pb-3 text-sm font-light tracking-wide transition-all relative flex items-center gap-2 ${
-                  activeTab === tab.id
-                    ? 'text-cyan-400'
-                    : 'text-gray-500 hover:text-gray-300'
-                }`}
-              >
-                <tab.icon className="w-4 h-4" strokeWidth={1.5} />
-                {tab.label}
-                {activeTab === tab.id && (
-                  <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-400 to-transparent"></div>
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
+        <TabsBar activeTab={activeTab as any} onSelect={(tab) => setActiveTab(tab)} />
 
         {/* Main Content */}
-        <div className="max-w-6xl mx-auto px-8 py-12 pb-20">
+        <div
+          className="max-w-6xl mx-auto px-8 py-12 pb-20"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
           {activeTab === 'game' && (
             <div className="grid lg:grid-cols-2 gap-8">
               {/* Click Area */}
@@ -831,112 +847,21 @@ export default function NeonClickerGame() {
                 </div>
 
                 {/* Click Power Upgrade */}
-                <div className="bg-gradient-to-br from-white/5 to-white/0 backdrop-blur-sm border border-white/10 rounded-2xl p-6 hover:border-cyan-500/30 transition-all duration-300">
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <div className="text-xs font-light tracking-widest text-gray-500 mb-1">CLICK POWER</div>
-                      <div className="text-3xl font-extralight text-cyan-400 flex items-center gap-3">
-                        {powerInfo.power}
-                        {powerInfo.build_time > 0 && (
-                          <span className="text-sm text-gray-400 flex items-center gap-1">
-                            <Timer className="w-4 h-4" />
-                            {formatTime(powerInfo.build_time)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-xs font-light tracking-widest text-gray-500 mb-1">COST</div>
-                      <div className="text-xl font-extralight text-purple-400">{(powerInfo.price ?? 0).toLocaleString()}</div>
-                    </div>
-                  </div>
-                  
-                  
-                  <button
-                    onClick={upgradePower}
-                    disabled={score < (powerInfo.price ?? 0) || powerInfo.is_building}
-                    className={`w-full py-3 rounded-xl font-light text-sm tracking-widest transition-all duration-300 flex items-center justify-center gap-2 ${
-                      score >= (powerInfo.price ?? 0) && !powerInfo.is_building
-                        ? 'bg-gradient-to-r from-cyan-500/20 to-purple-500/20 border border-cyan-400/30 hover:border-cyan-400/50 text-cyan-400 hover:scale-105 active:scale-95'
-                        : powerInfo.is_building
-                        ? 'bg-yellow-500/20 border border-yellow-400/30 text-yellow-400 cursor-not-allowed'
-                        : 'bg-white/5 border border-white/10 text-gray-600 cursor-not-allowed'
-                    }`}
-                  >
-                    {powerInfo.is_building ? (
-                      <>
-                        <Clock className="w-4 h-4 animate-pulse" />
-                        BUILDING... {formatTime(powerInfo.build_time_left)}
-                      </>
-                    ) : score >= (powerInfo.price ?? 0) ? (
-                      'UPGRADE'
-                    ) : (
-                      'INSUFFICIENT'
-                    )}
-                  </button>
-                </div>
+                <PowerUpgradeCard
+                  powerInfo={powerInfo}
+                  score={score}
+                  onUpgrade={upgradePower}
+                  formatTime={formatTime}
+                />
               </div>
 
               {/* Quick Producers Preview */}
-              <div className="space-y-4">
-                <div className="text-xs font-light tracking-widest text-gray-500 mb-4">QUICK ACCESS</div>
-                 {producers.slice(0, 3).map(producer => {
-                   const cost = producer.cost; // Backend already calculates the scaled cost
-                  return (
-                    <div
-                      key={producer.id}
-                      className="bg-gradient-to-br from-white/5 to-white/0 backdrop-blur-sm border border-white/10 rounded-2xl p-5 hover:border-cyan-500/30 transition-all duration-300"
-                    >
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-3">
-                          <div className={`text-3xl ${producer.owned > 0 ? '' : 'grayscale opacity-60'}`} style={producer.owned === 0 ? {
-                            filter: 'grayscale(100%) brightness(0.8) drop-shadow(0 0 8px rgba(6,182,212,0.4)) drop-shadow(0 0 16px rgba(6,182,212,0.2))',
-                            color: '#06b6d4'
-                          } : {}}>{producer.emoji}</div>
-                          <div>
-                            <div className="text-sm font-light text-white">{producer.name}</div>
-                            <div className="text-xs text-gray-500 flex items-center gap-2">
-                              +{producer.rate}/sec
-                              {producer.build_time > 0 && (
-                                <span className="flex items-center gap-1 text-gray-400">
-                                  <Timer className="w-3 h-3" />
-                                  {formatTime(producer.build_time)}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-lg font-light text-cyan-400">{producer.owned}</div>
-                          <div className="text-xs text-gray-500">owned</div>
-                        </div>
-                      </div>
-                      
-                      
-                      <button
-                        onClick={() => buyProducer(producer)}
-                        disabled={score < cost || producer.is_building}
-                        className={`w-full py-2 rounded-xl text-xs font-light tracking-widest transition-all flex items-center justify-center gap-2 ${
-                          score >= cost && !producer.is_building
-                            ? 'bg-cyan-500/20 border border-cyan-400/30 text-cyan-400 hover:bg-cyan-500/30'
-                            : producer.is_building
-                            ? 'bg-yellow-500/20 border border-yellow-400/30 text-yellow-400 cursor-not-allowed'
-                            : 'bg-white/5 border border-white/10 text-gray-600 cursor-not-allowed'
-                        }`}
-                      >
-                        {producer.is_building ? (
-                          <>
-                            <Clock className="w-3 h-3 animate-pulse" />
-                            BUILDING... {formatTime(producer.build_time_left)}
-                          </>
-                        ) : (
-                          `BUY - ${cost.toLocaleString()}`
-                        )}
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
+              <QuickAccessProducers
+                producers={producers}
+                score={score}
+                onBuy={buyProducer}
+                formatTime={formatTime}
+              />
             </div>
           )}
 
@@ -951,91 +876,18 @@ export default function NeonClickerGame() {
                      <div className="text-center text-gray-500">No producers available. Please try refreshing.</div>
                    ) : (
                      <div className="grid md:grid-cols-2 gap-6">
-                       {producers.map(producer => {
-                     const cost = producer.cost; // Backend already calculates the scaled cost
-                return (
-                  <div
-                    key={producer.id}
-                    className="bg-gradient-to-br from-white/5 to-white/0 backdrop-blur-sm border border-white/10 rounded-2xl p-6 hover:border-cyan-500/30 transition-all duration-300"
-                  >
-                    <div className="flex items-start gap-4 mb-4">
-                      <div className={`text-5xl ${producer.owned > 0 ? '' : 'grayscale opacity-60'}`} style={producer.owned === 0 ? {
-                        filter: 'grayscale(100%) brightness(0.8) drop-shadow(0 0 12px rgba(6,182,212,0.5)) drop-shadow(0 0 24px rgba(6,182,212,0.3))',
-                        color: '#06b6d4'
-                      } : {}}>{producer.emoji}</div>
-                      <div className="flex-1">
-                        <div className="text-lg font-light text-white mb-1">{producer.name}</div>
-                        <div className="text-sm text-gray-400 flex items-center gap-2">
-                          +{producer.rate} per second
-                          {producer.build_time > 0 && (
-                            <span className="flex items-center gap-1 text-gray-500">
-                              <Timer className="w-3 h-3" />
-                              {formatTime(producer.build_time)}
-                            </span>
-                          )}
-                      </div>
-                    </div>
-                    </div>
-                    {producer.owned > 0 && (
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <div className="text-xs text-gray-500">Owned</div>
-                        <div className="text-2xl font-mono font-extralight text-cyan-400">{producer.owned}</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-xs text-gray-500">Total Production</div>
-                        <div className="text-2xl font-mono font-extralight text-purple-400">{(producer.rate * producer.owned).toLocaleString()}/s</div>
-                      </div>
-                    </div>
-                    )}
-                    
-                    
-                    <button
-                      onClick={() => buyProducer(producer)}
-                      disabled={score < cost || producer.is_building}
-                      className={`w-full py-3 rounded-xl font-light text-sm tracking-widest transition-all duration-300 flex items-center justify-center gap-2 ${
-                        score >= cost && !producer.is_building
-                          ? 'bg-gradient-to-r from-cyan-500/20 to-purple-500/20 border border-cyan-400/30 hover:border-cyan-400/50 text-cyan-400'
-                          : producer.is_building
-                          ? 'bg-yellow-500/20 border border-yellow-400/30 text-yellow-400 cursor-not-allowed'
-                          : 'bg-white/5 border border-white/10 text-gray-600 cursor-not-allowed'
-                      }`}
-                    >
-                      {producer.is_building ? (
-                        <>
-                          <Clock className="w-4 h-4 animate-pulse" />
-                          BUILDING... {formatTime(producer.build_time_left)}
-                        </>
-                      ) : (
-                        `BUY - ${cost.toLocaleString()}`
-                      )}
-                    </button>
-                  </div>
-                  );
-                })}
+                       {producers.map(producer => (
+                         <ProducerItem
+                           key={producer.id}
+                           producer={producer}
+                           score={score}
+                           onBuy={buyProducer}
+                           formatTime={formatTime}
+                         />
+                       ))}
                      
-                     {/* Mystery Upgrade */}
-                     <div className="bg-gradient-to-br from-white/5 to-white/0 backdrop-blur-sm border border-white/10 rounded-2xl p-6 hover:border-cyan-500/30 transition-all duration-300 opacity-75">
-                       <div className="flex items-start gap-4 mb-4">
-                         <div className="text-5xl grayscale opacity-60" style={{
-                           filter: 'grayscale(100%) brightness(0.8) drop-shadow(0 0 12px rgba(6,182,212,0.5)) drop-shadow(0 0 24px rgba(6,182,212,0.3))',
-                           color: '#06b6d4'
-                         }}>❓</div>
-                         <div className="flex-1">
-                           <div className="text-lg font-light text-white mb-1">Unknown</div>
-                           <div className="text-sm text-gray-400 flex items-center gap-2">
-                             Open all above to continue
-                           </div>
-                         </div>
-                       </div>
-                       
-                       <button
-                         disabled={true}
-                         className="w-full py-3 rounded-xl font-light text-sm tracking-widest transition-all duration-300 flex items-center justify-center gap-2 bg-white/5 border border-white/10 text-gray-600 cursor-not-allowed"
-                       >
-                         UNLOCK ABOVE TO SEE
-                       </button>
-                     </div>
+
+
                      </div>
                    )}
                  </>
@@ -1043,61 +895,43 @@ export default function NeonClickerGame() {
             </div>
             )}
 
+          {activeTab === 'donations' && (
+            <div className="max-w-3xl mx-auto space-y-6">
+              {donationsLoading && (
+                <div className="text-center text-gray-500">Loading...</div>
+              )}
+              {!donationsLoading && donationGoals.length === 0 && (
+                <div className="text-center text-gray-500">No goals.</div>
+              )}
+              {!donationsLoading && donationGoals.map(g => {
+                const selected = !!showTopDonors[g.id];
+                return (
+                  <DonationItem
+                    key={g.id}
+                    goal={g}
+                    selected={selected}
+                    detailLoading={!!detailLoading[g.id]}
+                    detail={donationDetails[g.id]}
+                    onToggleTopDonors={(goalId, next) => setShowTopDonors(prev => ({ ...prev, [goalId]: next }))}
+                    onRequestDetail={fetchDonationGoalDetail}
+                    confirm={confirmDonation}
+                    submitting={donationSubmitting}
+                    success={donationSuccess}
+                    setConfirm={setConfirmDonation}
+                    onDonate={donate}
+                    score={score}
+                    formatCompact={formatCompact}
+                    formatPercent={formatPercent}
+                  />
+                );
+              })}
+            </div>
+          )}
+
           {activeTab === 'leaderboard' && (
             <div className="max-w-2xl mx-auto space-y-4">
-              {/* Live indicator and toggle */}
-              <div className="flex items-center justify-center gap-4 mb-6">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                  <span className="text-xs text-gray-400 font-light tracking-widest">LIVE</span>
-                </div>
-                
-                {/* Toggle switch */}
-                <div className="flex items-center gap-2">
-                  <button 
-                    className={`px-3 py-1 rounded text-xs transition-all duration-200 ${
-                      leaderboardMode === 'richest' 
-                        ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-400/30' 
-                        : 'text-gray-500 hover:text-gray-400'
-                    }`}
-                    onClick={() => {
-                      if (leaderboardMode !== 'richest') {
-                        setLeaderboardMode('richest');
-                      }
-                    }}
-                  >
-                    RICHEST
-                  </button>
-                  <button 
-                    className={`px-3 py-1 rounded text-xs transition-all duration-200 ${
-                      leaderboardMode === 'per_second' 
-                        ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-400/30' 
-                        : 'text-gray-500 hover:text-gray-400'
-                    }`}
-                    onClick={() => {
-                      if (leaderboardMode !== 'per_second') {
-                        setLeaderboardMode('per_second');
-                      }
-                    }}
-                  >
-                    PER SECOND
-                  </button>
-                  <button 
-                    className={`px-3 py-1 rounded text-xs transition-all duration-200 ${
-                      leaderboardMode === 'clicks' 
-                        ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-400/30' 
-                        : 'text-gray-500 hover:text-gray-400'
-                    }`}
-                    onClick={() => {
-                      if (leaderboardMode !== 'clicks') {
-                        setLeaderboardMode('clicks');
-                      }
-                    }}
-                  >
-                    CLICKS
-                  </button>
-                </div>
-              </div>
+              {/* Toggle switch */}
+              <LeaderboardTabs mode={leaderboardMode} onChange={setLeaderboardMode} />
               
               {!leaderboardLoading && leaderboardMode === 'richest' && hasInitiallyLoadedRichest && leaderboard.length === 0 && (
                 <div className="text-center text-gray-500">No leaders yet.</div>
@@ -1112,88 +946,19 @@ export default function NeonClickerGame() {
               
 
               {/* Richest leaderboard */}
-              {!leaderboardLoading && leaderboardMode === 'richest' && leaderboard.map((entry, index) => {
-                const isSelf = entry.is_self;
-                return (
-                  <div
-                    key={entry.user_id}
-                    className={`flex items-center justify-between bg-gradient-to-br from-white/5 to-white/0 backdrop-blur-sm border border-white/10 rounded-2xl p-5 hover:border-cyan-500/30 transition-all duration-300 ${isSelf ? 'border-yellow-400/40 bg-yellow-400/5' : ''}`}
-                  >
-                    <div className="flex items-center gap-5">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-light ${
-                        index === 0 ? 'bg-gradient-to-br from-yellow-400/30 to-yellow-400/10 text-yellow-400 border border-yellow-400/30' :
-                        index === 1 ? 'bg-gradient-to-br from-gray-300/30 to-gray-300/10 text-gray-300 border border-gray-300/30' :
-                        index === 2 ? 'bg-gradient-to-br from-orange-400/30 to-orange-400/10 text-orange-400 border border-orange-400/30' :
-                        'bg-white/5 text-gray-500 border border-white/10'
-                      }`}>
-                        {index + 1}
-                      </div>
-                      <div className={`font-light ${isSelf ? 'text-yellow-400' : 'text-gray-300'}`}>
-                        {isSelf ? 'You' : entry.user_id}
-                      </div>
-                    </div>
-                    <div className="text-2xl font-extralight text-cyan-400">
-                      {entry.score.toLocaleString()}
-                    </div>
-                  </div>
-                );
-              })}
+              {!leaderboardLoading && leaderboardMode === 'richest' && leaderboard.map((entry, index) => (
+                <LeaderboardItem key={entry.user_id} index={index} entry={entry} mode="richest" />
+              ))}
               
               {/* Per-second leaderboard */}
-              {!leaderboardLoading && leaderboardMode === 'per_second' && perSecondLeaderboard.map((entry, index) => {
-                const isSelf = entry.is_self;
-                return (
-                  <div
-                    key={entry.user_id}
-                    className={`flex items-center justify-between bg-gradient-to-br from-white/5 to-white/0 backdrop-blur-sm border border-white/10 rounded-2xl p-5 hover:border-cyan-500/30 transition-all duration-300 ${isSelf ? 'border-yellow-400/40 bg-yellow-400/5' : ''}`}
-                  >
-                    <div className="flex items-center gap-5">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-light ${
-                        index === 0 ? 'bg-gradient-to-br from-yellow-400/30 to-yellow-400/10 text-yellow-400 border border-yellow-400/30' :
-                        index === 1 ? 'bg-gradient-to-br from-gray-300/30 to-gray-300/10 text-gray-300 border border-gray-300/30' :
-                        index === 2 ? 'bg-gradient-to-br from-orange-400/30 to-orange-400/10 text-orange-400 border border-orange-400/30' :
-                        'bg-white/5 text-gray-500 border border-white/10'
-                      }`}>
-                        {index + 1}
-                      </div>
-                      <div className={`font-light ${isSelf ? 'text-yellow-400' : 'text-gray-300'}`}>
-                        {isSelf ? 'You' : entry.user_id}
-                      </div>
-                    </div>
-                    <div className="text-2xl font-extralight text-green-400">
-                      +{entry.production_rate.toLocaleString()}/s
-                    </div>
-                  </div>
-                );
-              })}
+              {!leaderboardLoading && leaderboardMode === 'per_second' && perSecondLeaderboard.map((entry, index) => (
+                <LeaderboardItem key={entry.user_id} index={index} entry={entry} mode="per_second" />
+              ))}
               
               {/* Clicks leaderboard */}
-              {!leaderboardLoading && leaderboardMode === 'clicks' && clicksLeaderboard.map((entry, index) => {
-                const isSelf = entry.is_self;
-                return (
-                  <div
-                    key={entry.user_id}
-                    className={`flex items-center justify-between bg-gradient-to-br from-white/5 to-white/0 backdrop-blur-sm border border-white/10 rounded-2xl p-5 hover:border-cyan-500/30 transition-all duration-300 ${isSelf ? 'border-yellow-400/40 bg-yellow-400/5' : ''}`}
-                  >
-                    <div className="flex items-center gap-5">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-light ${
-                        index === 0 ? 'bg-gradient-to-br from-yellow-400/30 to-yellow-400/10 text-yellow-400 border border-yellow-400/30' :
-                        index === 1 ? 'bg-gradient-to-br from-gray-300/30 to-gray-300/10 text-gray-300 border border-gray-300/30' :
-                        index === 2 ? 'bg-gradient-to-br from-orange-400/30 to-orange-400/10 text-orange-400 border border-orange-400/30' :
-                        'bg-white/5 text-gray-500 border border-white/10'
-                      }`}>
-                        {index + 1}
-                      </div>
-                      <div className={`font-light ${isSelf ? 'text-yellow-400' : 'text-gray-300'}`}>
-                        {isSelf ? 'You' : entry.user_id}
-                      </div>
-                    </div>
-                    <div className="text-2xl font-extralight text-purple-400">
-                      {entry.clicks.toLocaleString()}
-                    </div>
-                  </div>
-                );
-              })}
+              {!leaderboardLoading && leaderboardMode === 'clicks' && clicksLeaderboard.map((entry, index) => (
+                <LeaderboardItem key={entry.user_id} index={index} entry={entry} mode="clicks" />
+              ))}
             </div>
           )}
         </div>
@@ -1231,6 +996,19 @@ export default function NeonClickerGame() {
             opacity: 0.8;
             filter: drop-shadow(0 0 2px #06b6d4) drop-shadow(0 0 4px #06b6d4) drop-shadow(0 0 6px #06b6d4);
           }
+        }
+        
+        @keyframes neon-scan {
+          0% { background-position: 0% 0; }
+          100% { background-position: 200% 0; }
+        }
+
+        .neon-scan {
+          background: linear-gradient(90deg, rgba(6, 182, 212, 0) 0%, rgba(6, 182, 212, 0.25) 50%, rgba(6, 182, 212, 0) 100%);
+          background-size: 200% 100%;
+          animation: neon-scan 2s linear infinite;
+          opacity: 0.6;
+          mix-blend-mode: screen;
         }
         
       `}</style>
