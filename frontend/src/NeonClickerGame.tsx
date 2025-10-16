@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Trophy, Zap, ShoppingCart, Clock, Timer, Check } from 'lucide-react';
+import { Zap } from 'lucide-react';
 import { retrieveLaunchParams } from '@telegram-apps/sdk';
 import ProducerItem from './components/ProducerItem';
 import LeaderboardItem from './components/LeaderboardItem';
@@ -444,13 +444,7 @@ export default function NeonClickerGame() {
   };
 
   const [displayScore, setDisplayScore] = useState(0);
-  const [clickPower, setClickPower] = useState(1);
   const [activeTab, setActiveTab] = useState('game');
-  const [gas, setGas] = useState(500);
-  const [autoTapActive, setAutoTapActive] = useState(false);
-  const [boostActive, setBoostActive] = useState(false);
-  const [boostTimeLeft, setBoostTimeLeft] = useState(0);
-  const boostMultiplier = boostActive ? 2 : 1;
   const [clicks, setClicks] = useState([]);
   const [producers, setProducers] = useState<Producer[]>([]);
   const [producersLoading, setProducersLoading] = useState(true);
@@ -854,28 +848,8 @@ export default function NeonClickerGame() {
                          />
                        ))}
                      
-                     {/* Mystery Upgrade */}
-                     <div className="bg-gradient-to-br from-white/5 to-white/0 backdrop-blur-sm border border-white/10 rounded-2xl p-6 hover:border-cyan-500/30 transition-all duration-300 opacity-75">
-                       <div className="flex items-start gap-4 mb-4">
-                         <div className="text-5xl grayscale opacity-60" style={{
-                           filter: 'grayscale(100%) brightness(0.8) drop-shadow(0 0 12px rgba(6,182,212,0.5)) drop-shadow(0 0 24px rgba(6,182,212,0.3))',
-                           color: '#06b6d4'
-                         }}>❓</div>
-                         <div className="flex-1">
-                           <div className="text-lg font-light text-white mb-1">Unknown</div>
-                           <div className="text-sm text-gray-400 flex items-center gap-2">
-                             Open all above to continue
-                           </div>
-                         </div>
-                       </div>
-                       
-                       <button
-                         disabled={true}
-                         className="w-full py-3 rounded-xl font-light text-sm tracking-widest transition-all duration-300 flex items-center justify-center gap-2 bg-white/5 border border-white/10 text-gray-600 cursor-not-allowed"
-                       >
-                         UNLOCK ABOVE TO SEE
-                       </button>
-                     </div>
+
+
                      </div>
                    )}
                  </>
