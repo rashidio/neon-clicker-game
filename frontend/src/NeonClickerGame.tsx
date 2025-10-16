@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Trophy, Zap, ShoppingCart, Clock, Timer, Check } from 'lucide-react';
 import { retrieveLaunchParams } from '@telegram-apps/sdk';
 import ProducerItem from './components/ProducerItem';
+import LeaderboardItem from './components/LeaderboardItem';
 
 export default function NeonClickerGame() {
   // ==== BACKEND INTEGRATION BLOCK ====
@@ -1257,88 +1258,19 @@ export default function NeonClickerGame() {
               
 
               {/* Richest leaderboard */}
-              {!leaderboardLoading && leaderboardMode === 'richest' && leaderboard.map((entry, index) => {
-                const isSelf = entry.is_self;
-                return (
-                  <div
-                    key={entry.user_id}
-                    className={`flex items-center justify-between bg-gradient-to-br from-white/5 to-white/0 backdrop-blur-sm border border-white/10 rounded-2xl p-5 hover:border-cyan-500/30 transition-all duration-300 ${isSelf ? 'border-yellow-400/40 bg-yellow-400/5' : ''}`}
-                  >
-                    <div className="flex items-center gap-5">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-light ${
-                        index === 0 ? 'bg-gradient-to-br from-yellow-400/30 to-yellow-400/10 text-yellow-400 border border-yellow-400/30' :
-                        index === 1 ? 'bg-gradient-to-br from-gray-300/30 to-gray-300/10 text-gray-300 border border-gray-300/30' :
-                        index === 2 ? 'bg-gradient-to-br from-orange-400/30 to-orange-400/10 text-orange-400 border border-orange-400/30' :
-                        'bg-white/5 text-gray-500 border border-white/10'
-                      }`}>
-                        {index + 1}
-                      </div>
-                      <div className={`font-light ${isSelf ? 'text-yellow-400' : 'text-gray-300'}`}>
-                        {isSelf ? 'You' : entry.user_id}
-                      </div>
-                    </div>
-                    <div className="text-2xl font-extralight text-cyan-400">
-                      {entry.score.toLocaleString()}
-                    </div>
-                  </div>
-                );
-              })}
+              {!leaderboardLoading && leaderboardMode === 'richest' && leaderboard.map((entry, index) => (
+                <LeaderboardItem key={entry.user_id} index={index} entry={entry} mode="richest" />
+              ))}
               
               {/* Per-second leaderboard */}
-              {!leaderboardLoading && leaderboardMode === 'per_second' && perSecondLeaderboard.map((entry, index) => {
-                const isSelf = entry.is_self;
-                return (
-                  <div
-                    key={entry.user_id}
-                    className={`flex items-center justify-between bg-gradient-to-br from-white/5 to-white/0 backdrop-blur-sm border border-white/10 rounded-2xl p-5 hover:border-cyan-500/30 transition-all duration-300 ${isSelf ? 'border-yellow-400/40 bg-yellow-400/5' : ''}`}
-                  >
-                    <div className="flex items-center gap-5">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-light ${
-                        index === 0 ? 'bg-gradient-to-br from-yellow-400/30 to-yellow-400/10 text-yellow-400 border border-yellow-400/30' :
-                        index === 1 ? 'bg-gradient-to-br from-gray-300/30 to-gray-300/10 text-gray-300 border border-gray-300/30' :
-                        index === 2 ? 'bg-gradient-to-br from-orange-400/30 to-orange-400/10 text-orange-400 border border-orange-400/30' :
-                        'bg-white/5 text-gray-500 border border-white/10'
-                      }`}>
-                        {index + 1}
-                      </div>
-                      <div className={`font-light ${isSelf ? 'text-yellow-400' : 'text-gray-300'}`}>
-                        {isSelf ? 'You' : entry.user_id}
-                      </div>
-                    </div>
-                    <div className="text-2xl font-extralight text-green-400">
-                      +{entry.production_rate.toLocaleString()}/s
-                    </div>
-                  </div>
-                );
-              })}
+              {!leaderboardLoading && leaderboardMode === 'per_second' && perSecondLeaderboard.map((entry, index) => (
+                <LeaderboardItem key={entry.user_id} index={index} entry={entry} mode="per_second" />
+              ))}
               
               {/* Clicks leaderboard */}
-              {!leaderboardLoading && leaderboardMode === 'clicks' && clicksLeaderboard.map((entry, index) => {
-                const isSelf = entry.is_self;
-                return (
-                  <div
-                    key={entry.user_id}
-                    className={`flex items-center justify-between bg-gradient-to-br from-white/5 to-white/0 backdrop-blur-sm border border-white/10 rounded-2xl p-5 hover:border-cyan-500/30 transition-all duration-300 ${isSelf ? 'border-yellow-400/40 bg-yellow-400/5' : ''}`}
-                  >
-                    <div className="flex items-center gap-5">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-light ${
-                        index === 0 ? 'bg-gradient-to-br from-yellow-400/30 to-yellow-400/10 text-yellow-400 border border-yellow-400/30' :
-                        index === 1 ? 'bg-gradient-to-br from-gray-300/30 to-gray-300/10 text-gray-300 border border-gray-300/30' :
-                        index === 2 ? 'bg-gradient-to-br from-orange-400/30 to-orange-400/10 text-orange-400 border border-orange-400/30' :
-                        'bg-white/5 text-gray-500 border border-white/10'
-                      }`}>
-                        {index + 1}
-                      </div>
-                      <div className={`font-light ${isSelf ? 'text-yellow-400' : 'text-gray-300'}`}>
-                        {isSelf ? 'You' : entry.user_id}
-                      </div>
-                    </div>
-                    <div className="text-2xl font-extralight text-purple-400">
-                      {entry.clicks.toLocaleString()}
-                    </div>
-                  </div>
-                );
-              })}
+              {!leaderboardLoading && leaderboardMode === 'clicks' && clicksLeaderboard.map((entry, index) => (
+                <LeaderboardItem key={entry.user_id} index={index} entry={entry} mode="clicks" />
+              ))}
             </div>
           )}
         </div>
