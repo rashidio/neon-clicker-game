@@ -5,6 +5,7 @@ import ProducerItem from './components/ProducerItem';
 import LeaderboardItem from './components/LeaderboardItem';
 import DonationItem from './components/DonationItem';
 import PowerUpgradeCard from './components/PowerUpgradeCard';
+import { formatTime, formatCompact, formatPercent } from './utils/format';
 
 export default function NeonClickerGame() {
   // ==== BACKEND INTEGRATION BLOCK ====
@@ -732,50 +733,7 @@ export default function NeonClickerGame() {
 
   const totalProduction = producers.reduce((sum, p) => sum + (p.rate * p.owned), 0);
 
-  // Helper function to format time
-  const formatTime = (seconds) => {
-    if (seconds < 60) {
-      return `${seconds}s`;
-    } else if (seconds < 3600) {
-      // Less than 1 hour: show MM:SS
-      const minutes = Math.floor(seconds / 60);
-      const remainingSeconds = seconds % 60;
-      return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-    } else {
-      // 1 hour or more: show H:MM or HH:MM
-      const hours = Math.floor(seconds / 3600);
-      const minutes = Math.floor((seconds % 3600) / 60);
-      if (hours < 10) {
-        return `${hours}:${minutes.toString().padStart(2, '0')}h`;
-      } else {
-        return `${hours}h ${minutes}m`;
-      }
-    }
-  };
-
-  const formatCompact = (n: number | bigint) => {
-    const num = typeof n === 'bigint' ? Number(n) : (n ?? 0);
-    const abs = Math.abs(num);
-    if (abs >= 1_000_000_000_000) return `${Math.round(num / 1_000_000_000_000)}T`;
-    if (abs >= 1_000_000_000) return `${Math.round(num / 1_000_000_000)}B`;
-    if (abs >= 1_000_000) return `${Math.round(num / 1_000_000)}M`;
-    if (abs >= 1_000) return `${Math.round(num / 1_000)}K`;
-    return num.toLocaleString();
-  };
-
-  const formatPercent = (p: number) => {
-    if (!isFinite(p) || p <= 0) return '0%';
-    // Allow >100% display
-    if (p >= 1) {
-      // Show up to 2 decimals for large values
-      const val = p % 1 === 0 ? p.toFixed(0) : p.toFixed(2);
-      return `${val}%`;
-    }
-    const minShown = 0.00001;
-    if (p > 0 && p < minShown) return `${minShown}%`;
-    const fixed = p.toFixed(5);
-    return `${fixed.replace(/0+$/,'').replace(/\.$/, '')}%`;
-  };
+  // formatTime, formatCompact, formatPercent imported from utils/format
 
   // Detect when total production changes and trigger highlight
   useEffect(() => {
