@@ -15,8 +15,8 @@ RUN go mod download
 # Copy the source code
 COPY . .
 
-# Build the binary
-RUN go build -o emoji-clicker ./main.go
+# Build the binary (build the whole package so all files in package main are included)
+RUN go build -o emoji-clicker .
 
 # --- Final stage ---
 FROM alpine:latest

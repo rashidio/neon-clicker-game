@@ -694,7 +694,12 @@ export default function NeonClickerGame() {
 
   // Background production - sync with backend every 5 seconds
   useEffect(() => {
-    const totalProduction = producers.reduce((sum, p) => sum + (p.rate * p.owned), 0);
+    const effGrowth = 1.10; // must match backend lineProduction effGrowth
+    const lineProduction = (baseRate: number, owned: number) => {
+      if (!owned || !baseRate) return 0;
+      return Math.floor(owned * baseRate * Math.pow(effGrowth, owned - 1));
+    };
+    const totalProduction = producers.reduce((sum, p) => sum + lineProduction(p.rate, p.owned), 0);
     
     if (totalProduction > 0) {
       // Local smooth increment for immediate feedback
@@ -772,7 +777,10 @@ export default function NeonClickerGame() {
     }
   };
 
-  const totalProduction = producers.reduce((sum, p) => sum + (p.rate * p.owned), 0);
+  const totalProduction = producers.reduce(
+    (sum, p) => sum + Math.floor((p.owned && p.rate) ? (p.owned * p.rate * Math.pow(1.10, p.owned - 1)) : 0),
+    0
+  );
 
   // formatTime, formatCompact, formatPercent imported from utils/format
 

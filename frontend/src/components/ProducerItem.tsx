@@ -13,6 +13,17 @@ export interface ProducerItemProps {
 const ProducerItem: React.FC<ProducerItemProps> = ({ producer, score, onBuy, formatTime, compact = false }) => {
   const cost = producer.cost;
   const disabled = score < cost || producer.is_building;
+  // Match backend lineProduction: owned * baseRate * 1.10^(owned-1)
+  const effGrowth = 1.10;
+  const effectiveLine = Math.floor(
+    producer.owned && producer.rate ? (producer.owned * producer.rate * Math.pow(effGrowth, producer.owned - 1)) : 0
+  );
+  const nextEffectiveLine = Math.floor(
+    (producer.rate ? ((producer.owned + 1) * producer.rate * Math.pow(effGrowth, Math.max(0, producer.owned))) : 0)
+  );
+  const deltaEffective = Math.max(0, nextEffectiveLine - effectiveLine);
+  const displayCurrent = producer.owned > 0 ? effectiveLine : (producer.rate || 0);
+  const nextAdd = producer.owned > 0 ? deltaEffective : (producer.rate || 0);
 
   if (compact) {
     return (
@@ -38,7 +49,7 @@ const ProducerItem: React.FC<ProducerItemProps> = ({ producer, score, onBuy, for
             <div>
               <div className="text-sm font-light text-white">{producer.name}</div>
               <div className="text-xs text-gray-500 flex items-center gap-2">
-                +{producer.rate}/sec
+                +{nextAdd} per second
                 {producer.build_time > 0 && (
                   <span className="flex items-center gap-1 text-gray-400">
                     <Timer className="w-3 h-3" />
@@ -100,7 +111,7 @@ const ProducerItem: React.FC<ProducerItemProps> = ({ producer, score, onBuy, for
         <div className="flex-1">
           <div className="text-lg font-light text-white mb-1">{producer.name}</div>
           <div className="text-sm text-gray-400 flex items-center gap-2">
-            +{producer.rate} per second
+            +{nextAdd} per second
             {producer.build_time > 0 && (
               <span className="flex items-center gap-1 text-gray-500">
                 <Timer className="w-3 h-3" />
@@ -118,9 +129,9 @@ const ProducerItem: React.FC<ProducerItemProps> = ({ producer, score, onBuy, for
             <div className="text-2xl font-mono font-extralight text-cyan-400">{producer.owned}</div>
           </div>
           <div className="text-right">
-            <div className="text-xs text-gray-500">Total Production</div>
+            <div className="text-xs text-gray-500">Production</div>
             <div className="text-2xl font-mono font-extralight text-purple-400">
-              {(producer.rate * producer.owned).toLocaleString()}/s
+              +{displayCurrent.toLocaleString()}/s
             </div>
           </div>
         </div>
