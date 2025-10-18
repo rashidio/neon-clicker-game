@@ -147,18 +147,27 @@ const DonationItem: React.FC<DonationItemProps> = ({
               {(detail.top_donors || []).length === 0 && (
                 <div className="text-xs text-gray-400 italic">No donors yet.</div>
               )}
-              {(detail.top_donors || []).slice(0, 5).map((d, i) => (
-                <div
-                  key={i}
-                  className={`flex items-center justify-between bg-gradient-to-br from-white/5 to-white/0 backdrop-blur-sm border border-white/10 rounded-xl p-3 ${i === 0 ? 'border-yellow-400/30' : 'hover:border-cyan-500/30'} transition-all`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-light ${i === 0 ? 'bg-yellow-400/20 text-yellow-300 border border-yellow-400/30' : 'bg-white/5 text-gray-400 border border-white/10'}`}>{i + 1}</div>
-                    <div className="font-light text-gray-300">{d.user_id}</div>
+              {(detail.top_donors || []).slice(0, 5).map((d, i) => {
+                const isSelf = !!(d as any).is_self;
+                return (
+                  <div
+                    key={i}
+                    className={`flex items-center justify-between bg-gradient-to-br from-white/5 to-white/0 backdrop-blur-sm rounded-xl p-3 transition-all ${
+                      i === 0 ? 'border border-yellow-400/30' : 'border hover:border-cyan-500/30'
+                    } ${isSelf ? 'border-yellow-400/40 bg-yellow-400/5' : 'border-white/10'}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-light ${
+                        i === 0 ? 'bg-yellow-400/20 text-yellow-300 border border-yellow-400/30' : 'bg-white/5 text-gray-400 border border-white/10'
+                      }`}>{i + 1}</div>
+                      <div className={`font-light ${isSelf ? 'text-yellow-400' : 'text-gray-300'}`}>
+                        {isSelf ? 'You' : d.user_id}
+                      </div>
+                    </div>
+                    <div className="text-cyan-400">{Number(d.amount).toLocaleString()}</div>
                   </div>
-                  <div className="text-cyan-400">{Number(d.amount).toLocaleString()}</div>
-                </div>
-              ))}
+                );
+              })}
             </>
           )}
         </div>

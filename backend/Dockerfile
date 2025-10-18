@@ -16,7 +16,7 @@ RUN go mod download
 COPY . .
 
 # Build the binary (build the whole package so all files in package main are included)
-RUN go build -o emoji-clicker .
+RUN go build -o neon-clicker .
 
 # --- Final stage ---
 FROM alpine:latest
@@ -27,11 +27,11 @@ RUN apk add --no-cache ca-certificates
 WORKDIR /app
 
 # Copy the built binary
-COPY --from=builder /app/emoji-clicker .
+COPY --from=builder /app/neon-clicker .
 
 # Expose port
 # EXPOSE 8080
 
 # Run the binary
-CMD ["./emoji-clicker"]
+CMD ["./neon-clicker"]
 

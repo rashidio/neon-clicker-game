@@ -1,4 +1,4 @@
-module emoji-clicker
+module neon-clicker
 
 go 1.25
 

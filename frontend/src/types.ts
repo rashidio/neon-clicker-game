@@ -51,6 +51,7 @@ export interface DonationGoal {
 export interface DonationTopDonor {
   user_id: string;
   amount: number;
+  is_self?: boolean;
 }
 
 export interface DonationGoalDetail {

@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
+	core "neon-clicker/core"
+	handlers "neon-clicker/handlers"
 )
 
 var ctx = context.Background()
@@ -18,6 +20,8 @@ var ctx = context.Background()
 type Server struct {
 	rdb *redis.Client
 	botToken string
+	auth *handlers.Auth
+	prod *handlers.Producers
 }
 
 func NewServer(addr string) *Server {
@@ -25,11 +29,12 @@ func NewServer(addr string) *Server {
 		Addr: addr,
 	})
 	botToken := os.Getenv("TELEGRAM_BOT_TOKEN")
-	return &Server{rdb: rdb, botToken: botToken}
+	a := handlers.NewAuth(rdb, botToken)
+	return &Server{rdb: rdb, botToken: botToken, auth: a}
 }
 
 func (s *Server) handleGetState(w http.ResponseWriter, r *http.Request) {
-	session, err := s.authenticateRequest(r)
+	session, err := s.auth.AuthenticateRequest(r)
 	if err != nil {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
@@ -61,7 +66,7 @@ func (s *Server) handleGetState(w http.ResponseWriter, r *http.Request) {
 	authHeader := r.Header.Get("Authorization")
 	if strings.HasPrefix(authHeader, "tma ") || (user == "1234567" && authHeader == "") {
 		// This was a new session, return the session ID
-		sessionID, err := s.createSession(user, session.TelegramUser)
+		sessionID, err := s.auth.CreateSession(user, session.TelegramUser)
 		if err == nil {
 			w.Header().Set("X-Session-ID", sessionID)
 		}
@@ -106,8 +111,8 @@ func (s *Server) startBackgroundProduction() {
 				// Check for completed producer builds
 				s.checkAndCompleteProducerBuilds(userID)
 				
-				// Get user's production
-				production, err := s.getTotalProduction(userID)
+				// Get user's production via producers helper
+				production, err := s.prod.GetTotalProduction(userID)
 				if err != nil || production == 0 {
 					continue
 				}
@@ -142,8 +147,8 @@ func (s *Server) checkAndCompletePowerUpgrade(userID string) {
 		if err2 != nil { price = 10 }
 		
 		// Apply the upgrade
-		newPower := calculateNextPower(power)
-		newPrice := calculateNextPowerPrice(price)
+		newPower := core.CalculateNextPower(power)
+		newPrice := core.CalculateNextPowerPrice(price)
 		
 		s.rdb.Set(ctx, "power:"+userID, newPower, 0)
 		s.rdb.Set(ctx, "power_price:"+userID, newPrice, 0)
@@ -156,7 +161,7 @@ func (s *Server) checkAndCompleteProducerBuilds(userID string) {
 	now := time.Now().Unix()
 	
 	// Check all producers for completed builds
-	for _, producer := range defaultProducers {
+	for _, producer := range core.DefaultProducers {
 		buildEndTime, err := s.rdb.Get(ctx, "producer_build_end:"+userID+":"+strconv.Itoa(producer.ID)).Int64()
 		if err != nil {
 			continue // No build in progress for this producer
@@ -181,25 +186,30 @@ func main() {
 	}
 
 	s := NewServer(addr)
+	p := handlers.NewProducers(s.rdb, s.auth)
+	u := handlers.NewUpgrades(s.rdb, s.auth)
+	st := handlers.NewState(s.rdb, s.auth)
+	lb := handlers.NewLeaderboard(s.rdb, s.auth, p)
+	d := handlers.NewDonations(s.rdb, s.auth)
 	
-	// Start background production
+	// Attach producers helper to server and start background production
+	s.prod = p
 	s.startBackgroundProduction()
 
-	http.HandleFunc("/api/state", s.handleGetState)
-	http.HandleFunc("/api/click", s.handleClick)
-	http.HandleFunc("/api/leaderboard", s.handleLeaderboard)
-	http.HandleFunc("/api/per_second_leaderboard", s.handlePerSecondLeaderboard)
-	http.HandleFunc("/api/clicks_leaderboard", s.handleClicksLeaderboard)
-	http.HandleFunc("/api/user_upgrades", s.handleGetUpgrades)
-	http.HandleFunc("/api/upgrade_power", s.handleUpgradePower)
-	http.HandleFunc("/api/producers", s.handleGetProducers)
-	http.HandleFunc("/api/buy_producer", s.handleBuyProducer)
-	http.HandleFunc("/api/production", s.handleGetProduction)
-	http.HandleFunc("/api/donations/goals", s.handleListDonationGoals)
-	http.HandleFunc("/api/donations/goal", s.handleGetDonationGoal)
-	http.HandleFunc("/api/donations/donate", s.handleDonate)
+	http.HandleFunc("/api/state", st.HandleGetState)
+	http.HandleFunc("/api/click", u.HandleClick)
+	http.HandleFunc("/api/leaderboard", lb.HandleLeaderboard)
+	http.HandleFunc("/api/per_second_leaderboard", lb.HandlePerSecond)
+	http.HandleFunc("/api/clicks_leaderboard", lb.HandleClicks)
+	http.HandleFunc("/api/user_upgrades", u.HandleGetUpgrades)
+	http.HandleFunc("/api/upgrade_power", u.HandleUpgradePower)
+	http.HandleFunc("/api/producers", p.HandleGetProducers)
+	http.HandleFunc("/api/buy_producer", p.HandleBuyProducer)
+	http.HandleFunc("/api/production", p.HandleGetProduction)
+	http.HandleFunc("/api/donations/goals", d.HandleListGoals)
+	http.HandleFunc("/api/donations/goal", d.HandleGetGoal)
+	http.HandleFunc("/api/donations/donate", d.HandleDonate)
 
 	log.Println("Server started on :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
-

@@ -1,21 +1,21 @@
-package main
+package core
 
 // Producer represents a production line in the game
-// It is referenced by handlers like `handleGetProducers()` and `handleBuyProducer()`.
+// It is referenced by handlers like getProducers and buyProducer.
 type Producer struct {
-	ID           int    `json:"id"`
-	Name         string `json:"name"`
-	Cost         int    `json:"cost"`
-	Rate         int    `json:"rate"`
-	Owned        int    `json:"owned"`
-	Emoji        string `json:"emoji"`
-	BuildTime    int    `json:"build_time"`
-	IsBuilding   bool   `json:"is_building"`
-	BuildTimeLeft int64 `json:"build_time_left"`
+	ID            int    `json:"id"`
+	Name          string `json:"name"`
+	Cost          int    `json:"cost"`
+	Rate          int    `json:"rate"`
+	Owned         int    `json:"owned"`
+	Emoji         string `json:"emoji"`
+	BuildTime     int    `json:"build_time"`
+	IsBuilding    bool   `json:"is_building"`
+	BuildTimeLeft int64  `json:"build_time_left"`
 }
 
-// Neon Sign Production Supply Chain - From raw materials to global distribution
-var defaultProducers = []Producer{
+// DefaultProducers - Neon Sign Production Supply Chain - From raw materials to global distribution
+var DefaultProducers = []Producer{
 	// Phase 1: Raw Material Extraction (1-20/sec)
 	{ID: 1, Name: "Glass Quarry", Cost: 15, Rate: 1, Owned: 0, Emoji: "🏔️"},
 	{ID: 2, Name: "Gas Extractor", Cost: 35, Rate: 2, Owned: 0, Emoji: "⛽"},

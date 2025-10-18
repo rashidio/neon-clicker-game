@@ -1,14 +1,15 @@
-package main
+package core
 
 // DonationGoal defines a global donation target for the community
-// Used by handlers like `handleListDonationGoals()` and `handleGetDonationGoal()`.
+// Used by handlers like ListDonationGoals and GetDonationGoal
 type DonationGoal struct {
-    ID   int    `json:"id"`
-    Name string `json:"name"`
-    Target int64 `json:"target"`
+    ID     int    `json:"id"`
+    Name   string `json:"name"`
+    Target int64  `json:"target"`
 }
 
-var donationGoals = []DonationGoal{
+// DonationGoals is the list of global donation targets
+var DonationGoals = []DonationGoal{
     {ID: 1, Name: "Pay US Debt", Target: 32000000000000},
     {ID: 2, Name: "Cleanup Oceans", Target: 92000000000000},
     {ID: 3, Name: "End Global Hunger", Target: 350000000000000},

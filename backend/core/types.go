@@ -1,4 +1,4 @@
-package main
+package core
 
 type TelegramUser struct {
 	ID int `json:"id"`
